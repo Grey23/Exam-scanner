@@ -1,0 +1,301 @@
+.admin-page-content {
+  --background: linear-gradient(180deg, #f9fafb 0%, #ffffff 50%, #f9fafb 100%);
+}
+
+.admin-header {
+  --background: linear-gradient(135deg, #15803d 0%, #166534 100%);
+  position: sticky;
+  top: 0;
+  z-index: 99;
+}
+
+.header-toolbar {
+  --background: transparent;
+  --color: #f3f4f6;
+}
+
+.header-title-section {
+  flex: 1;
+  text-align: center;
+}
+
+.header-title {
+  font-weight: 600;
+  font-size: 18px;
+}
+
+.menu-button {
+  --color: #f3f4f6;
+}
+
+.page-container {
+  padding: 16px;
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+/* Stats Row */
+.stats-row {
+  display: flex;
+  gap: 16px;
+  margin-bottom: 20px;
+}
+
+.stat-card {
+  flex: 1;
+  margin: 0;
+  --background: linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%);
+  border-radius: 12px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+}
+
+.stat-card ion-card-content {
+  padding: 16px;
+  text-align: center;
+}
+
+.stat-value {
+  font-size: 28px;
+  font-weight: 700;
+  color: #166534;
+}
+
+.stat-label {
+  font-size: 12px;
+  color: #6b7280;
+  margin-top: 4px;
+}
+
+/* Search */
+.search-section {
+  margin-bottom: 12px;
+}
+
+/* Filter Buttons */
+.filter-buttons {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 16px;
+  flex-wrap: wrap;
+}
+
+.filter-buttons ion-button {
+  --border-radius: 20px;
+  font-size: 13px;
+  font-weight: 500;
+}
+
+/* Loading & Empty */
+.loading-container,
+.empty-state {
+  padding: 48px 24px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  color: #6b7280;
+  gap: 12px;
+}
+
+.empty-icon {
+  font-size: 48px;
+  color: #d1d5db;
+}
+
+/* Users Cards (Mobile-friendly) */
+.users-cards {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.user-card {
+  margin: 0;
+  --background: #ffffff;
+  border-radius: 12px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+}
+
+.user-card ion-card-content {
+  padding: 16px;
+}
+
+.user-header {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.user-avatar {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #16a34a 0%, #15803d 100%);
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  font-size: 18px;
+  flex-shrink: 0;
+}
+
+.user-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.user-info .user-name {
+  font-size: 16px;
+  font-weight: 600;
+  color: #1f2937;
+  margin: 0 0 4px 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.user-info .user-email {
+  font-size: 13px;
+  color: #6b7280;
+  margin: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Badge */
+.badge {
+  display: inline-block;
+  padding: 4px 10px;
+  border-radius: 9999px;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  flex-shrink: 0;
+}
+
+.badge.admin {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+.badge.teacher {
+  background: #dbeafe;
+  color: #1e40af;
+}
+
+/* User Details */
+.user-details {
+  padding: 8px 0;
+  border-top: 1px solid #f3f4f6;
+  margin-bottom: 12px;
+}
+
+.detail-row {
+  display: flex;
+  justify-content: space-between;
+  font-size: 13px;
+}
+
+.detail-label {
+  color: #6b7280;
+}
+
+.detail-value {
+  color: #1f2937;
+  font-weight: 500;
+}
+
+/* User Actions */
+.user-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.user-actions ion-button {
+  --padding-start: 12px;
+  --padding-end: 12px;
+  font-size: 12px;
+}
+
+/* Pagination */
+.pagination {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  margin-top: 20px;
+  padding: 16px 0;
+}
+
+.page-info {
+  font-size: 14px;
+  color: #6b7280;
+  font-weight: 500;
+}
+
+/* Modal */
+.modal-content {
+  --background: #f9fafb;
+}
+
+.modal-content ion-list {
+  background: transparent;
+  padding: 16px;
+}
+
+.modal-actions {
+  padding: 16px;
+}
+
+.password-user-info {
+  padding: 20px 16px;
+  text-align: center;
+  background: #fff;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.password-user-info p {
+  margin: 0;
+}
+
+.password-user-info .email {
+  color: #6b7280;
+  font-size: 13px;
+  margin-top: 4px;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .stats-row {
+    flex-direction: column;
+  }
+
+  .user-header {
+    flex-wrap: wrap;
+  }
+
+  .badge {
+    margin-top: 8px;
+  }
+
+  .user-actions {
+    flex-direction: column;
+  }
+
+  .user-actions ion-button {
+    width: 100%;
+  }
+
+  .pagination {
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .pagination ion-button {
+    width: 100%;
+  }
+}

@@ -1,0 +1,32 @@
+<app-admin-sidebar menuId="main" contentId="main-content" activePage="modules"></app-admin-sidebar>
+
+<ion-header class="admin-header">
+  <ion-toolbar color="primary" class="header-toolbar">
+    <ion-buttons slot="start">
+      <ion-menu-button auto-hide="false" class="menu-button"></ion-menu-button>
+    </ion-buttons>
+    <div class="header-title-section">
+      <ion-title class="header-title">Modules Monitor</ion-title>
+    </div>
+  </ion-toolbar>
+</ion-header>
+
+<ion-content id="main-content" class="admin-page-content">
+  <div class="page-container">
+    <ion-card class="list-card">
+      <ion-card-header>
+        <ion-card-title>System Parts</ion-card-title>
+      </ion-card-header>
+      <ion-card-content>
+        <ion-list lines="inset">
+          <ion-item *ngFor="let m of modules">
+            <ion-label>
+              <h2>{{ m.name }}</h2>
+              <p>Status: {{ m.status }}</p>
+            </ion-label>
+          </ion-item>
+        </ion-list>
+      </ion-card-content>
+    </ion-card>
+  </div>
+</ion-content>

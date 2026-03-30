@@ -74,16 +74,44 @@
       <div class="section-header">
         <h2>Exam Analytics</h2>
       </div>
+      
+      <!-- Totals as Stat Cards -->
+      <div class="totals-stats-grid">
+        <div class="stat-card scans">
+          <div class="stat-icon">
+            <ion-icon name="scan-outline"></ion-icon>
+          </div>
+          <div class="stat-info">
+            <h3>{{ dashboardData.totalScans || 0 }}</h3>
+            <p>Total Scans</p>
+          </div>
+        </div>
+
+        <div class="stat-card questions">
+          <div class="stat-icon">
+            <ion-icon name="help-circle-outline"></ion-icon>
+          </div>
+          <div class="stat-info">
+            <h3>{{ dashboardData.totalQuestions || 0 }}</h3>
+            <p>Questions Generated</p>
+          </div>
+        </div>
+
+        <div class="stat-card accuracy">
+          <div class="stat-icon">
+            <ion-icon name="checkmark-circle-outline"></ion-icon>
+          </div>
+          <div class="stat-info">
+            <h3>{{ dashboardData.averageScore | number: '1.1-1' }}%</h3>
+            <p>Average Score</p>
+          </div>
+        </div>
+      </div>
+
       <div class="analytics-grid">
         <div class="analytics-card">
           <h3>Answer Accuracy</h3>
           <canvas id="summaryChart"></canvas>
-        </div>
-        <div class="analytics-card">
-          <h3>Totals</h3>
-          <p><strong>Total Scans:</strong> {{ dashboardData.totalScans || 0 }}</p>
-          <p><strong>Questions Generated:</strong> {{ dashboardData.totalQuestions || 0 }}</p>
-          <p><strong>Average Score:</strong> {{ dashboardData.averageScore | number: '1.1-1' }}%</p>
         </div>
       </div>
     </div>

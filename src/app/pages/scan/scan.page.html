@@ -18,47 +18,28 @@
     <div class="camera-preview-wrapper">
       <video #video autoplay muted playsinline class="camera-video"></video>
       <canvas #canvas class="scanner-canvas"></canvas>
-      
-      <!-- Scan Overlay Guide - OpenCV alignment frame (full-screen, auto-capture) -->
+
       <div class="scan-overlay" *ngIf="!isProcessing">
         <div class="sheet-guide">
           <div class="sheet-frame">
-            <div class="header-box" title="Header area"></div>
-
-            <!-- Perfect-square viewfinder around the virtual sheet -->
-            <div class="sheet-corner-view tl"></div>
-            <div class="sheet-corner-view tr"></div>
-            <div class="sheet-corner-view bl"></div>
-            <div class="sheet-corner-view br"></div>
-
-            <div class="corner-hint tl-hint">Align corner here</div>
-            <div class="corner-hint tr-hint">Align corner here</div>
-            <div class="corner-hint bl-hint">Align corner here</div>
-            <div class="corner-hint br-hint">Align corner here</div>
+            <div class="header-box"></div>
+            <div class="sheet-corner-view tl" [class.detected]="detectedMarkers['tl']"></div>
+            <div class="sheet-corner-view tr" [class.detected]="detectedMarkers['tr']"></div>
+            <div class="sheet-corner-view bl" [class.detected]="detectedMarkers['bl']"></div>
+            <div class="sheet-corner-view br" [class.detected]="detectedMarkers['br']"></div>
           </div>
         </div>
 
-        <div class="corner tl" [class.detected]="detectedMarkers['tl']" title="Top-left marker"></div>
-        <div class="corner tr" [class.detected]="detectedMarkers['tr']" title="Top-right marker"></div>
-        <div class="corner bl" [class.detected]="detectedMarkers['bl']" title="Bottom-left marker"></div>
-        <div class="corner br" [class.detected]="detectedMarkers['br']" title="Bottom-right marker"></div>
-
         <div class="alignment-tip">
-          Fill the whole camera view with the sheet and keep all 4 black corner squares visible.
+          <span *ngIf="detectedMarkers['tl'] && detectedMarkers['tr'] && detectedMarkers['bl'] && detectedMarkers['br']" style="color: #4cd964;">
+            ✓ All corners detected - Ready to scan!
+          </span>
+          <span *ngIf="!(detectedMarkers['tl'] && detectedMarkers['tr'] && detectedMarkers['bl'] && detectedMarkers['br'])">
+            Align the sheet so all 4 corner squares turn green.
+          </span>
         </div>
-
-        <div class="progress-container" *ngIf="autoCaptureCount > 0">
-          <svg class="progress-svg" viewBox="0 0 100 100">
-            <circle class="bg" cx="50" cy="50" r="45"></circle>
-            <circle class="fg" cx="50" cy="50" r="45"
-              [style.stroke-dashoffset]="283 - (283 * autoCaptureCount / AUTO_CAPTURE_THRESHOLD)">
-            </circle>
-          </svg>
-        </div>
-
-        <div class="guide-text">{{ statusMessage }}</div>
       </div>
-
+      
       <!-- Processing Indicator -->
       <div class="processing-overlay" *ngIf="isProcessing">
         <ion-spinner name="crescent"></ion-spinner>
@@ -66,20 +47,27 @@
       </div>
     </div>
 
-    <!-- Auto-capture only for live camera; optional gallery import -->
-    <div class="controls auto-mode-note">
-      <span>Auto capture: fill the frame with the sheet and hold the phone steady.</span>
+    <!-- Controls: manual scan + gallery -->
+    <div class="controls manual-mode-note">
+      <span>Point the camera at the answer sheet and press SCAN NOW.</span>
       <div style="font-size: 12px; opacity: 0.8; margin-top: 4px;">
-        Use bright, even lighting and keep the camera roughly parallel to the page.
+        Make sure all 4 corner markers are visible and the sheet fills most of the screen.
       </div>
+
+      <!-- Primary manual action -->
+      <ion-button expand="block" color="primary" class="main-scan-btn" (click)="capture()" [disabled]="isProcessing">
+        <ion-icon name="scan" slot="start"></ion-icon>
+        SCAN NOW
+      </ion-button>
+
       <ion-button expand="block" size="small" fill="outline" color="medium" (click)="importFromGallery()">
         <ion-icon name="images" slot="start"></ion-icon>
         Import from Gallery
       </ion-button>
     </div>
 
-    <div class="status-bar" [class.error]="lastError" [class.success]="statusMessage === 'Ready to scan'">
-      {{ lastError || statusMessage }}
+    <div class="status-bar" *ngIf="lastError" [class.error]="true">
+      {{ lastError }}
     </div>
   </div>
 
@@ -107,6 +95,23 @@
           <span class="value">{{ blankCount }}</span>
           <span class="label">Blank</span>
         </div>
+      </div>
+    </div>
+
+    <!-- Scanned Sheet Preview (what the scanner actually used) -->
+    <div class="scan-preview" *ngIf="scannedPreviewImage">
+      <h3 class="section-title">Scanned Sheet Preview</h3>
+      <p class="section-subtitle">This is the image used for grading. The circles show where bubbles were read.</p>
+
+      <div class="scan-preview-frame">
+        <img
+          #resultImage
+          class="scan-preview-image"
+          [src]="scannedPreviewImage"
+          (load)="renderScanOverlay()"
+          alt="Scanned sheet"
+        />
+        <canvas #resultOverlay class="scan-preview-overlay"></canvas>
       </div>
     </div>
 

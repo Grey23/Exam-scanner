@@ -16,17 +16,13 @@ app.get('/', (req, res) => {
     version: '1.0.0',
     endpoints: {
       health: '/api/health',
-      auth: '/api/auth',
-      teacher: '/api/teacher',
-      student: '/api/student'
+      admin: '/api/admin'
     }
   });
 });
 
 // Routes
-app.use('/api/auth', require('./routes/auth'));
-app.use('/api/teacher', require('./routes/teacher'));
-app.use('/api/student', require('./routes/student'));
+app.use('/api/admin', require('./routes/admin'));
 
 // Health check
 app.get('/api/health', (req, res) => {

@@ -7,12 +7,14 @@ import { IonicModule } from '@ionic/angular';
 import { AdminDashboardPageRoutingModule } from './admin-dashboard-routing.module';
 
 import { AdminDashboardPage } from './admin-dashboard.page';
+import { AdminSidebarComponent } from '../admin-sidebar/admin-sidebar.component';
 
 @NgModule({
   imports: [
     CommonModule,
     FormsModule,
     IonicModule,
+    AdminSidebarComponent,
     AdminDashboardPageRoutingModule
   ],
   declarations: [AdminDashboardPage]

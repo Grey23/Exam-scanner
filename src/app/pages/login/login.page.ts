@@ -1,5 +1,5 @@
 import { Component } from '@angular/core';
-import { Router } from '@angular/router';
+import { Router, ActivatedRoute } from '@angular/router';
 import { AuthService } from '../../services/auth.service';
 import { ToastController } from '@ionic/angular';
 
@@ -15,12 +15,35 @@ export class LoginPage {
   isLoading = false;
   showPassword = false;
   loginSuccess = false;
+  logoutSuccess = false;
 
   constructor(
     private authService: AuthService,
     private router: Router,
+    private route: ActivatedRoute,
     private toastController: ToastController
   ) {}
+
+  ionViewWillEnter() {
+    // Reset all state when entering the page
+    this.loginSuccess = false;
+    this.logoutSuccess = false;
+    this.email = '';
+    this.password = '';
+    this.isLoading = false;
+    this.showPassword = false;
+
+    // Check if coming from logout
+    this.route.queryParams.subscribe(params => {
+      if (params['logout'] === 'true') {
+        this.logoutSuccess = true;
+        // Hide logout success after 2 seconds
+        setTimeout(() => {
+          this.logoutSuccess = false;
+        }, 2000);
+      }
+    });
+  }
 
   async login() {
     if (!this.email || !this.password) {
@@ -54,6 +77,10 @@ export class LoginPage {
 
   goToRegister() {
     this.router.navigate(['/register']);
+  }
+
+  goToForgotPassword() {
+    this.router.navigate(['/forgot-password']);
   }
 
   togglePasswordVisibility() {

@@ -130,15 +130,15 @@ export class StudentDashboardPage implements OnInit {
 
   async logout() {
     const alert = await this.alertController.create({
-      header: 'Confirm Logout',
+      header: 'Logout',
       message: 'Are you sure you want to logout?',
       buttons: [
         {
-          text: 'Cancel',
+          text: 'No',
           role: 'cancel'
         },
         {
-          text: 'Logout',
+          text: 'Yes',
           handler: async () => {
             await this.authService.logout();
             this.navCtrl.navigateRoot('/login');

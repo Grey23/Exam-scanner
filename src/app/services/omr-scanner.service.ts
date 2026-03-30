@@ -27,7 +27,10 @@ export interface ScanProcessResult {
   gradingResults: GradingResult[];
   studentHash?: number | null;
   usedNative?: boolean;
+  warpedImageBase64?: string | null;
 }
+
+export type CornerHints = import('./opencv-scanner.service').CornerHints;
 
 @Injectable({ providedIn: 'root' })
 export class OmrScannerService {
@@ -40,20 +43,12 @@ export class OmrScannerService {
 
   /**
    * Check if NativeScan (OpenCV) is available (Android only)
+   * DISABLED: OpenCV native library has loading issues, using web-based processing instead
    */
   async isNativeScanAvailable(): Promise<boolean> {
-    if (this.nativeAvailable !== null) return this.nativeAvailable;
-    if (Capacitor.getPlatform() !== 'android') {
-      this.nativeAvailable = false;
-      return false;
-    }
-    try {
-      const r = await NativeScan.ping();
-      this.nativeAvailable = r?.ok === true;
-    } catch {
-      this.nativeAvailable = false;
-    }
-    return this.nativeAvailable ?? false;
+    // Force disabled - use web-based processing only
+    console.log('[OMR] NativeScan disabled, using web-based processing');
+    return false;
   }
 
   private readonly MAX_DIM = 1400;
@@ -75,34 +70,46 @@ export class OmrScannerService {
   }
 
   /**
-   * Process a canvas frame - NativeScan on Android, OpenCV.js on web, OmrLite fallback
+   * Process a canvas frame - uses web-based processing (OpenCV.js or OmrLite fallback)
+   * NativeScan (native OpenCV) is disabled due to library loading issues
    */
   async processFrame(
     canvas: HTMLCanvasElement,
-    answerKey: string[]
+    answerKey: string[],
+    cornerHints?: CornerHints | null
   ): Promise<ScanProcessResult> {
     const workCanvas = this.maybeDownscale(canvas);
-    const useNative = await this.isNativeScanAvailable();
 
-    if (useNative) {
-      return this.processWithNativeScan(workCanvas, answerKey);
-    }
+    const scaledHints: CornerHints | null = (() => {
+      if (!cornerHints) return null;
+      if (workCanvas === canvas) return cornerHints;
+
+      const sx = workCanvas.width / Math.max(1, canvas.width);
+      const sy = workCanvas.height / Math.max(1, canvas.height);
+      return {
+        tl: { x: cornerHints.tl.x * sx, y: cornerHints.tl.y * sy },
+        tr: { x: cornerHints.tr.x * sx, y: cornerHints.tr.y * sy },
+        br: { x: cornerHints.br.x * sx, y: cornerHints.br.y * sy },
+        bl: { x: cornerHints.bl.x * sx, y: cornerHints.bl.y * sy }
+      };
+    })();
 
     try {
       console.log('[OMR] Checking OpenCV availability...');
       const cv = (window as any).cv;
       if (cv?.Mat) {
-        console.log('[OMR] ✅ OpenCV already ready, running scan...');
-        const result = await this.openCvScanner.processFrame(workCanvas, answerKey);
+        console.log('[OMR] ✅ OpenCV.js ready, running scan...');
+        const result = await this.openCvScanner.processFrame(workCanvas, answerKey, scaledHints);
         console.log('[OMR] ✅ OpenCV scan completed successfully');
         return {
           gradingResults: result.gradingResults,
           studentHash: result.studentHash,
-          usedNative: false
+          usedNative: false,
+          warpedImageBase64: result.warpedImageBase64 ?? null
         };
       }
       
-      console.log('[OMR] OpenCV not ready, using OmrLite fallback...');
+      console.log('[OMR] OpenCV.js not ready, using OmrLite fallback...');
       return this.processWithOmrLite(workCanvas, answerKey);
     } catch (e: any) {
       console.error('[OMR] ❌ Scan error:', e?.message || e);

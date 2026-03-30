@@ -1,0 +1,37 @@
+.admin-page-content {
+  --background: linear-gradient(180deg, #f9fafb 0%, #ffffff 50%, #f9fafb 100%);
+}
+
+.admin-header {
+  --background: linear-gradient(135deg, #15803d 0%, #166534 100%);
+  position: sticky;
+  top: 0;
+  z-index: 99;
+}
+
+.header-toolbar {
+  --background: transparent;
+  --color: #f3f4f6;
+}
+
+.header-title-section {
+  flex: 1;
+  text-align: center;
+}
+
+.header-title {
+  font-weight: 600;
+  font-size: 18px;
+}
+
+.menu-button {
+  --color: #f3f4f6;
+}
+
+.page-container {
+  padding: 16px;
+}
+
+.list-card {
+  border-radius: 12px;
+}

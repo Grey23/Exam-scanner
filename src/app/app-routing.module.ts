@@ -19,6 +19,14 @@ const routes: Routes = [
     loadChildren: () => import('./pages/register/register.module').then(m => m.RegisterPageModule)
   },
   {
+    path: 'forgot-password',
+    loadComponent: () => import('./pages/forgot-password/forgot-password.page').then(m => m.ForgotPasswordPage)
+  },
+  {
+    path: 'reset-password',
+    loadComponent: () => import('./pages/reset-password/reset-password.page').then(m => m.ResetPasswordPage)
+  },
+  {
     path: 'home',
     loadChildren: () => import('./home/home.module').then(m => m.HomePageModule),
     canActivate: [AuthGuard]
@@ -31,6 +39,21 @@ const routes: Routes = [
   {
     path: 'admin-dashboard',
     loadChildren: () => import('./pages/admin-dashboard/admin-dashboard.module').then(m => m.AdminDashboardPageModule),
+    canActivate: [AdminGuard]
+  },
+  {
+    path: 'admin-users',
+    loadComponent: () => import('./pages/admin-users/admin-users.page').then(m => m.AdminUsersPage),
+    canActivate: [AdminGuard]
+  },
+  {
+    path: 'admin-system-monitor',
+    loadComponent: () => import('./pages/admin-system-monitor/admin-system-monitor.page').then(m => m.AdminSystemMonitorPage),
+    canActivate: [AdminGuard]
+  },
+  {
+    path: 'admin-modules-monitor',
+    loadComponent: () => import('./pages/admin-modules-monitor/admin-modules-monitor.page').then(m => m.AdminModulesMonitorPage),
     canActivate: [AdminGuard]
   },
   {

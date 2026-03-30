@@ -1,5 +1,7 @@
 {
   "projects": {
     "default": "exam-scanner-b0867"
-  }
+  },
+  "targets": {},
+  "etags": {}
 }

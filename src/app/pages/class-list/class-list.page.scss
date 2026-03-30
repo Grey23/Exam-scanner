@@ -10,9 +10,9 @@
 :host {
   --classlist-surface: #ffffff;
   --classlist-surface-2: #f9fafb;
-  --classlist-text: #111827;
-  --classlist-text-muted: rgba(17, 24, 39, 0.72);
-  --classlist-bg: linear-gradient(135deg, #f5f7fa 0%, #e9ecef 100%);
+  --classlist-text: #0f172a;
+  --classlist-text-muted: rgba(15, 23, 42, 0.72);
+  --classlist-bg: linear-gradient(135deg, #eff6ff 0%, #dbeafe 50%, #bfdbfe 100%);
 }
 
 .sidebar-menu {
@@ -165,8 +165,10 @@
 
 .custom-header {
   .header-toolbar {
-    --background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    --background: linear-gradient(135deg, #2563eb 0%, #3b82f6 100%);
     padding-bottom: 8px;
+    // Safe area padding for mobile devices
+    padding-top: env(safe-area-inset-top);
 
     .header-title {
       font-weight: 700;
@@ -204,8 +206,9 @@
 
 /* Header Section with Stats */
 .header-section {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: linear-gradient(135deg, #2563eb 0%, #3b82f6 100%);
   padding: 24px 16px;
+  padding-top: calc(24px + env(safe-area-inset-top));
   color: white;
   margin-bottom: 32px;
 
@@ -749,12 +752,12 @@
 /* Dark Theme Support */
 @media (prefers-color-scheme: dark) {
   :host {
-    --classlist-surface: #2d3561;
-    --classlist-surface-2: #27305a;
+    --classlist-surface: #1e293b;
+    --classlist-surface-2: #0f172a;
     --classlist-text: rgba(255, 255, 255, 0.92);
     --classlist-text-muted: rgba(255, 255, 255, 0.70);
     --classlist-border: rgba(255, 255, 255, 0.10);
-    --classlist-bg: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+    --classlist-bg: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
   }
 
   .class-list-content {

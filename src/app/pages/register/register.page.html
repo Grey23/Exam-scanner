@@ -1,159 +1,157 @@
-<ion-header class="register-header">
-  <ion-toolbar>
-    <ion-buttons slot="start">
-      <ion-back-button defaultHref="/login"></ion-back-button>
-    </ion-buttons>
-    <ion-title>Create Account</ion-title>
-  </ion-toolbar>
-</ion-header>
-
 <ion-content class="register-content">
-  <div class="register-container">
-    <div class="header-section">
-      <h1>Join Us</h1>
-      <p>Create your account to get started</p>
+  <div class="register-wrapper">
+    <!-- Decorative Background -->
+    <div class="bg-decoration">
+      <div class="bg-circle bg-circle-1"></div>
+      <div class="bg-circle bg-circle-2"></div>
+      <div class="bg-circle bg-circle-3"></div>
     </div>
 
-    <form (ngSubmit)="register()" class="register-form">
-      <!-- User Type Selection -->
-      <div class="user-type-selector">
-        <h3>I am a:</h3>
-        <ion-segment
-          [(ngModel)]="userType"
-          name="userType"
-          class="type-segment"
-        >
-          <ion-segment-button value="teacher">
-            <ion-icon name="person-outline"></ion-icon>
-            <ion-label>Teacher</ion-label>
-          </ion-segment-button>
-        <ion-segment-button value="admin">
-          <ion-icon name="school-outline"></ion-icon>
-          <ion-label>Admin</ion-label>
-          </ion-segment-button>
-        </ion-segment>
+    <div class="register-container">
+      <!-- Back Button -->
+      <ion-button fill="clear" class="back-btn" routerLink="/login">
+        <ion-icon slot="start" name="arrow-back-outline"></ion-icon>
+        Back to Login
+      </ion-button>
+
+      <!-- Icon Section -->
+      <div class="icon-section">
+        <div class="icon-wrapper">
+          <ion-icon name="person-add-outline"></ion-icon>
+        </div>
       </div>
 
-      <!-- Full Name Input -->
-      <ion-item class="input-item">
-        <ion-label position="floating">Full Name</ion-label>
-        <ion-input
-          type="text"
-          [(ngModel)]="name"
-          name="name"
-          placeholder="Enter your full name"
-          required
-        ></ion-input>
-        <ion-icon slot="start" name="person-outline"></ion-icon>
-      </ion-item>
+      <!-- Header -->
+      <div class="form-header">
+        <h2>Create Account</h2>
+        <p>Join us and get started today</p>
+      </div>
 
-      <!-- School Name (for admins) -->
-      <ion-item class="input-item" *ngIf="userType === 'admin'">
-        <ion-label position="floating">School Name</ion-label>
-        <ion-input
-          type="text"
-          [(ngModel)]="schoolName"
-          name="schoolName"
-          placeholder="Enter school name"
-        ></ion-input>
-        <ion-icon slot="start" name="school-outline"></ion-icon>
-      </ion-item>
+      <form (ngSubmit)="register()" class="register-form">
+        <!-- User Type Selection -->
+        <div class="user-type-section">
+          <div class="input-label">
+            <ion-icon name="people-outline"></ion-icon>
+            <span>I am a</span>
+          </div>
+          <div class="type-buttons">
+            <button type="button" class="type-btn" [class.active]="userType === 'teacher'" (click)="userType = 'teacher'">
+              <ion-icon name="person-outline"></ion-icon>
+              <span>Teacher</span>
+            </button>
+            <button type="button" class="type-btn" [class.active]="userType === 'admin'" (click)="userType = 'admin'">
+              <ion-icon name="school-outline"></ion-icon>
+              <span>Admin</span>
+            </button>
+          </div>
+        </div>
 
-      <!-- Email Input -->
-      <ion-item class="input-item">
-        <ion-label position="floating">Email Address</ion-label>
-        <ion-input
-          type="email"
-          [(ngModel)]="email"
-          name="email"
-          placeholder="Enter your email"
-          required
-        ></ion-input>
-        <ion-icon slot="start" name="mail-outline"></ion-icon>
-      </ion-item>
+        <div class="input-group">
+          <div class="input-label">
+            <ion-icon name="person-outline"></ion-icon>
+            <span>Full Name</span>
+          </div>
+          <div class="input-wrapper">
+            <ion-input
+              type="text"
+              [(ngModel)]="name"
+              name="name"
+              placeholder="Enter your full name"
+              required
+            ></ion-input>
+          </div>
+        </div>
 
-      <!-- Password Input -->
-      <ion-item class="input-item">
-        <ion-label position="floating">Password</ion-label>
-        <ion-input
-          [type]="showPassword ? 'text' : 'password'"
-          [(ngModel)]="password"
-          name="password"
-          placeholder="At least 6 characters"
-          required
-        ></ion-input>
-        <ion-icon slot="start" name="lock-closed-outline"></ion-icon>
-        <ion-button
-          slot="end"
-          fill="clear"
-          (click)="togglePasswordVisibility()"
-          class="toggle-password"
-        >
-          <ion-icon [name]="showPassword ? 'eye-off-outline' : 'eye-outline'"></ion-icon>
+        <div class="input-group" *ngIf="userType === 'admin'">
+          <div class="input-label">
+            <ion-icon name="school-outline"></ion-icon>
+            <span>School Name</span>
+          </div>
+          <div class="input-wrapper">
+            <ion-input
+              type="text"
+              [(ngModel)]="schoolName"
+              name="schoolName"
+              placeholder="Enter school name"
+            ></ion-input>
+          </div>
+        </div>
+
+        <div class="input-group">
+          <div class="input-label">
+            <ion-icon name="mail-outline"></ion-icon>
+            <span>Email Address</span>
+          </div>
+          <div class="input-wrapper">
+            <ion-input
+              type="email"
+              [(ngModel)]="email"
+              name="email"
+              placeholder="Enter your email"
+              required
+            ></ion-input>
+          </div>
+        </div>
+
+        <div class="input-group">
+          <div class="input-label">
+            <ion-icon name="lock-closed-outline"></ion-icon>
+            <span>Password</span>
+          </div>
+          <div class="input-wrapper">
+            <ion-input
+              [type]="showPassword ? 'text' : 'password'"
+              [(ngModel)]="password"
+              name="password"
+              placeholder="At least 6 characters"
+              required
+            ></ion-input>
+            <ion-button fill="clear" (click)="togglePasswordVisibility()" class="toggle-btn" type="button">
+              <ion-icon [name]="showPassword ? 'eye-off-outline' : 'eye-outline'"></ion-icon>
+            </ion-button>
+          </div>
+        </div>
+
+        <div class="input-group">
+          <div class="input-label">
+            <ion-icon name="checkmark-done-outline"></ion-icon>
+            <span>Confirm Password</span>
+          </div>
+          <div class="input-wrapper">
+            <ion-input
+              [type]="showConfirmPassword ? 'text' : 'password'"
+              [(ngModel)]="confirmPassword"
+              name="confirmPassword"
+              placeholder="Confirm your password"
+              required
+            ></ion-input>
+            <ion-button fill="clear" (click)="toggleConfirmPasswordVisibility()" class="toggle-btn" type="button">
+              <ion-icon [name]="showConfirmPassword ? 'eye-off-outline' : 'eye-outline'"></ion-icon>
+            </ion-button>
+          </div>
+        </div>
+
+        <ion-button expand="block" type="submit" class="submit-btn" [disabled]="isLoading">
+          <ion-spinner *ngIf="isLoading" name="crescent"></ion-spinner>
+          <span *ngIf="!isLoading">
+            <ion-icon name="checkmark-circle-outline"></ion-icon>
+            Create Account
+          </span>
         </ion-button>
-      </ion-item>
+      </form>
 
-      <!-- Confirm Password Input -->
-      <ion-item class="input-item">
-        <ion-label position="floating">Confirm Password</ion-label>
-        <ion-input
-          [type]="showConfirmPassword ? 'text' : 'password'"
-          [(ngModel)]="confirmPassword"
-          name="confirmPassword"
-          placeholder="Confirm your password"
-          required
-        ></ion-input>
-        <ion-icon slot="start" name="lock-open-outline"></ion-icon>
-        <ion-button
-          slot="end"
-          fill="clear"
-          (click)="toggleConfirmPasswordVisibility()"
-          class="toggle-password"
-        >
-          <ion-icon [name]="showConfirmPassword ? 'eye-off-outline' : 'eye-outline'"></ion-icon>
+      <!-- Divider -->
+      <div class="divider">
+        <span>or</span>
+      </div>
+
+      <!-- Login Link -->
+      <div class="login-section">
+        <p>Already have an account?</p>
+        <ion-button expand="block" fill="outline" routerLink="/login" class="login-btn">
+          <ion-icon slot="start" name="log-in-outline"></ion-icon>
+          Sign In
         </ion-button>
-      </ion-item>
-
-      <!-- Register Button -->
-      <ion-button
-        expand="block"
-        type="submit"
-        class="register-button"
-        [disabled]="isLoading"
-      >
-        <ion-spinner *ngIf="isLoading" name="crescent"></ion-spinner>
-        <span *ngIf="!isLoading">Create Account</span>
-      </ion-button>
-    </form>
-
-    <!-- Login Link -->
-    <div class="login-link">
-      <p>Already have an account?</p>
-      <ion-button
-        fill="clear"
-        (click)="goToLogin()"
-        class="login-btn"
-      >
-        Login here
-      </ion-button>
-    </div>
-
-    <!-- Features Section -->
-    <div class="features-section">
-      <h3>Why join us?</h3>
-      <div class="feature-list">
-        <div class="feature-item">
-          <ion-icon name="checkmark-circle-outline"></ion-icon>
-          <span>{{ userType === 'teacher' ? 'Scan and grade answer sheets instantly' : 'Manage entire school and classes' }}</span>
-        </div>
-        <div class="feature-item">
-          <ion-icon name="checkmark-circle-outline"></ion-icon>
-          <span>{{ userType === 'teacher' ? 'Analyze student performance' : 'Oversee all teachers and progress' }}</span>
-        </div>
-        <div class="feature-item">
-          <ion-icon name="checkmark-circle-outline"></ion-icon>
-          <span>{{ userType === 'teacher' ? 'Create professional reports' : 'Generate school-wide reports' }}</span>
-        </div>
       </div>
     </div>
   </div>

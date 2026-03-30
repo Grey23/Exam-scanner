@@ -1,214 +1,296 @@
-.login-header {
-  --background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-
-  ion-toolbar {
-    --background: transparent;
-    --border-color: transparent;
-  }
-
-  ion-title {
-    color: white;
-    font-weight: 600;
-    font-size: 24px;
-  }
+.login-content {
+  --background: linear-gradient(135deg, #eff6ff 0%, #dbeafe 50%, #bfdbfe 100%);
+  --overflow: hidden;
 }
 
-.login-content {
-  --background: linear-gradient(180deg, #f8f9fa 0%, #f0f2f5 100%);
-  /* Let content start below header and scroll naturally on small screens */
+.login-wrapper {
+  min-height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px 16px;
+  position: relative;
+}
+
+// Decorative Background Circles
+.bg-decoration {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  overflow: hidden;
+  pointer-events: none;
+  z-index: 0;
+}
+
+.bg-circle {
+  position: absolute;
+  border-radius: 50%;
+  opacity: 0.15;
+}
+
+.bg-circle-1 {
+  width: 300px;
+  height: 300px;
+  background: linear-gradient(135deg, #2563eb, #3b82f6);
+  top: -100px;
+  right: -80px;
+}
+
+.bg-circle-2 {
+  width: 200px;
+  height: 200px;
+  background: linear-gradient(135deg, #1d4ed8, #2563eb);
+  bottom: -50px;
+  left: -50px;
+}
+
+.bg-circle-3 {
+  width: 150px;
+  height: 150px;
+  background: linear-gradient(135deg, #3b82f6, #60a5fa);
+  top: 40%;
+  left: 10%;
 }
 
 .login-container {
+  position: relative;
+  z-index: 1;
   width: 100%;
-  max-width: 400px;
-  padding: 20px 20px 32px;
-  margin: 0 auto;
+  max-width: 420px;
+  background: rgba(255, 255, 255, 0.95);
+  border-radius: 24px;
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.15);
+  padding: 32px 24px;
+  backdrop-filter: blur(10px);
 }
 
-.logo-section {
-  text-align: center;
-  margin-bottom: 40px;
+// Icon Section
+.icon-section {
+  display: flex;
+  justify-content: center;
+  margin-bottom: 24px;
 
-  h1 {
-    font-size: 32px;
+  .icon-wrapper {
+    width: 80px;
+    height: 80px;
+    background: linear-gradient(135deg, #2563eb 0%, #3b82f6 100%);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 10px 30px rgba(37, 99, 235, 0.3);
+
+    ion-icon {
+      font-size: 40px;
+      color: #ffffff;
+    }
+  }
+}
+
+// Form Header
+.form-header {
+  text-align: center;
+  margin-bottom: 28px;
+
+  h2 {
+    color: #0f172a;
+    font-size: 24px;
     font-weight: 700;
-    color: #333;
-    margin: 0 0 8px 0;
+    margin: 0 0 6px;
   }
 
   p {
+    color: #64748b;
     font-size: 14px;
-    color: #666;
     margin: 0;
   }
 }
 
+// Form Inputs
 .login-form {
-  background: white;
-  border-radius: 12px;
-  padding: 24px;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
-  margin-bottom: 24px;
+  .input-group {
+    margin-bottom: 20px;
 
-  .input-item {
-    --padding-start: 0;
-    --padding-end: 0;
-    --inner-padding-end: 0;
-    margin-bottom: 16px;
-    border-bottom: 2px solid #e8e8e8;
-    --highlight-color-focused: #667eea;
-    --highlight-color-invalid: #ff6b6b;
-
-    ion-label {
-      color: #666;
-      font-size: 13px;
-    }
-
-    ion-input {
-      font-size: 15px;
-      color: #333;
-      --padding-top: 8px;
-      --padding-bottom: 8px;
-    }
-
-    ion-icon[slot="start"] {
-      color: #667eea;
-      margin-right: 12px;
-      font-size: 20px;
-    }
-
-    .toggle-password {
-      height: 32px;
-      width: 32px;
+    .input-label {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 8px;
 
       ion-icon {
-        color: #667eea;
+        color: #2563eb;
         font-size: 18px;
+      }
+
+      span {
+        color: #374151;
+        font-size: 14px;
+        font-weight: 600;
       }
     }
 
-    &:focus-within {
-      border-bottom-color: #667eea;
+    .input-wrapper {
+      display: flex;
+      align-items: center;
+      background: #f8fafc;
+      border: 2px solid #e5e7eb;
+      border-radius: 12px;
+      padding: 0 12px;
+      transition: all 0.2s ease;
+
+      &:focus-within {
+        border-color: #2563eb;
+        background: #ffffff;
+        box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+      }
+
+      ion-input {
+        flex: 1;
+        --padding-top: 14px;
+        --padding-bottom: 14px;
+        font-size: 15px;
+        color: #0f172a;
+      }
+
+      .toggle-btn {
+        --padding-start: 8px;
+        --padding-end: 8px;
+        height: 36px;
+        min-width: 36px;
+
+        ion-icon {
+          color: #6b7280;
+          font-size: 20px;
+        }
+      }
     }
   }
 }
 
-.login-button {
-  --background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  --background-hover: linear-gradient(135deg, #5568d3 0%, #6a4190 100%);
-  height: 48px;
-  font-weight: 600;
+// Submit Button
+.submit-btn {
+  --background: linear-gradient(135deg, #2563eb 0%, #3b82f6 100%);
+  --border-radius: 12px;
+  --box-shadow: 0 4px 14px rgba(37, 99, 235, 0.3);
+  height: 52px;
+  font-weight: 700;
   font-size: 16px;
-  border-radius: 8px;
-  margin-top: 24px;
-  box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
+  margin-top: 8px;
 
   ion-spinner {
-    margin-right: 8px;
+    --color: #ffffff;
+    width: 22px;
+    height: 22px;
   }
 
-  &:disabled {
-    opacity: 0.7;
+  span {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+  }
+
+  &[disabled] {
+    --opacity: 0.7;
   }
 }
 
-.register-link {
+// Forgot Button
+.forgot-btn {
+  --color: #2563eb;
+  font-weight: 600;
+  font-size: 14px;
+  margin-top: 12px;
+  height: 44px;
+}
+
+// Divider
+.divider {
+  display: flex;
+  align-items: center;
+  margin: 24px 0;
+
+  &::before,
+  &::after {
+    content: '';
+    flex: 1;
+    height: 1px;
+    background: #e5e7eb;
+  }
+
+  span {
+    padding: 0 16px;
+    color: #9ca3af;
+    font-size: 13px;
+    font-weight: 500;
+  }
+}
+
+// Register Section
+.register-section {
   text-align: center;
-  margin-bottom: 32px;
 
   p {
+    color: #64748b;
     font-size: 14px;
-    color: #666;
-    margin: 0 0 8px 0;
+    margin: 0 0 12px;
   }
 
   .register-btn {
-    --color: #667eea;
+    --border-color: #2563eb;
+    --color: #2563eb;
+    --border-radius: 12px;
+    height: 48px;
     font-weight: 600;
-    font-size: 14px;
-    height: auto;
-    padding: 8px 0;
-
-    &:hover {
-      --color: #764ba2;
-    }
-  }
-}
-
-.info-cards {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 12px;
-
-  .info-card {
-    background: white;
-    border-radius: 8px;
-    padding: 16px;
-    text-align: center;
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
-    transition: transform 0.3s ease;
+    font-size: 15px;
 
     ion-icon {
-      font-size: 32px;
-      color: #667eea;
-      margin-bottom: 8px;
-    }
-
-    h3 {
-      font-size: 13px;
-      font-weight: 600;
-      color: #333;
-      margin: 8px 0 4px 0;
-    }
-
-    p {
-      font-size: 11px;
-      color: #999;
-      margin: 0;
-      line-height: 1.3;
-    }
-
-    &:hover {
-      transform: translateY(-2px);
-      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+      color: #2563eb;
     }
   }
 }
 
-.login-success-overlay {
+// Success Overlay
+.login-success-overlay,
+.logout-success-overlay {
   position: fixed;
   inset: 0;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  background: rgba(255, 255, 255, 0.9);
+  background: rgba(255, 255, 255, 0.95);
   z-index: 1000;
   animation: loginFadeIn 0.2s ease-out;
 }
 
-.login-success-overlay .check-circle {
+.login-success-overlay .check-circle,
+.logout-success-overlay .check-circle {
   width: 96px;
   height: 96px;
   border-radius: 50%;
-  background: #4caf50;
+  background: linear-gradient(135deg, #2563eb 0%, #3b82f6 100%);
   display: flex;
   align-items: center;
   justify-content: center;
-  box-shadow: 0 8px 24px rgba(76, 175, 80, 0.5);
+  box-shadow: 0 8px 24px rgba(37, 99, 235, 0.4);
   animation: loginScaleIn 0.25s ease-out;
 }
 
-.login-success-overlay .check-circle ion-icon {
+.login-success-overlay .check-circle ion-icon,
+.logout-success-overlay .check-circle ion-icon {
   font-size: 64px;
   color: #fff;
 }
 
-.login-success-overlay p {
+.login-success-overlay p,
+.logout-success-overlay p {
   margin-top: 16px;
   font-size: 16px;
-  color: #333;
+  color: #0f172a;
+  font-weight: 600;
 }
 
 @keyframes loginScaleIn {
@@ -227,24 +309,27 @@
   to { opacity: 1; }
 }
 
+// Responsive
 @media (max-width: 480px) {
-  .login-container {
-    max-width: 100%;
+  .login-wrapper {
+    padding: 16px;
   }
 
-  .logo-section {
-    margin-bottom: 32px;
+  .login-container {
+    padding: 24px 20px;
+    border-radius: 20px;
+  }
 
-    h1 {
-      font-size: 28px;
+  .icon-section .icon-wrapper {
+    width: 70px;
+    height: 70px;
+
+    ion-icon {
+      font-size: 35px;
     }
   }
 
-  .login-form {
-    padding: 20px;
-  }
-
-  .info-cards {
-    grid-template-columns: 1fr;
+  .form-header h2 {
+    font-size: 22px;
   }
 }

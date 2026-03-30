@@ -38,21 +38,15 @@ export class OmrLiteService {
     const imageData = ctx.getImageData(0, 0, width, height);
     const data = imageData.data;
 
-    // 1. Prefer quadrant marker detection (reduces false positives from filled bubbles)
-    let markersToUse: Point[] = [];
+    // 1. Corner marker detection (reduces false positives from arbitrary scenes)
+    //    We require 4 reliable markers; if we can't see the template, we fail
+    //    fast instead of returning fake results.
     const quadMarkers = this.detectMarkers(data, width, height);
-    if (quadMarkers.length === 4) {
-      markersToUse = quadMarkers.map(m => m.center);
-    } else {
-      // 2. Fallback: GLOBAL SEARCH for markers (Find markers ANYWHERE in the image)
-      const allMarkers = this.findAllMarkersGlobal(data, width, height);
-      const bestRect = this.findBestSheetRectangle(allMarkers);
-      if (bestRect && bestRect.length === 4) {
-        markersToUse = bestRect;
-      } else {
-        throw new Error(`Sheet not fully visible. Ensure all 4 corner markers are in the photo.`);
-      }
+    if (quadMarkers.length !== 4) {
+      throw new Error(`Sheet not fully visible. Ensure all 4 black corner markers are inside the frame.`);
     }
+
+    const markersToUse: Point[] = quadMarkers.map(m => m.center);
 
     // 3. Compute Perspective Transform
     const sortedMarkers = this.sortCorners(markersToUse);
@@ -103,7 +97,9 @@ export class OmrLiteService {
         const ringMean = this.getMeanBrightnessInRing(data, width, height, imgPt, ringInner, ringOuter);
 
         const bg = Number.isFinite(ringMean) && ringMean > 0 ? ringMean : innerMean;
-        const score = bg > 0 ? this.clamp01((bg - innerMean) / bg) : 0;
+        // Normalize relative to local background so light pencil shading still registers.
+        const denom = Math.max(60, bg);
+        const score = denom > 0 ? this.clamp01((bg - innerMean) / denom) : 0;
         fills.push({ option: opt, score });
       });
 
@@ -124,8 +120,14 @@ export class OmrLiteService {
     const idx = Math.min(sorted.length - 1, Math.max(0, Math.floor(qStrong * (sorted.length - 1))));
     const strong = sorted.length > 0 ? sorted[idx] : 0.0;
 
-    const approxMinFill = Math.max(0.12, Math.min(0.30, strong * 0.65));
-    const approxMinGap = Math.max(0.04, Math.min(0.14, approxMinFill * 0.5));
+    const maxBest = bestScores.length > 0 ? Math.max(...bestScores) : 0.0;
+
+    // More forgiving thresholds for low‑quality cameras / younger students:
+    // - Allow slightly lighter fills to count as marked.
+    // - Still require a reasonable gap between top and second option to avoid double-mark noise.
+    const baseFill = strong > 0 ? strong * 0.6 : 0.16;
+    const approxMinFill = Math.max(0.10, Math.min(0.28, baseFill));
+    const approxMinGap = Math.max(0.05, Math.min(0.16, approxMinFill * 0.55));
     const confidentMarks = perQuestionData.filter(
       (d) => d.top.score >= approxMinFill && (d.top.score - d.second.score) >= approxMinGap
     ).length;
@@ -143,7 +145,9 @@ export class OmrLiteService {
 
     // Single-pass thresholds: conservative baseline so blank sheets remain blank
     // even without a separate "blank sheet" shortcut.
-    const minFill = approxMinFill;
+    // Lower cutoff so lightly-marked pencil sheets are not forced to blank.
+    const isLikelyBlankSheet = maxBest < 0.12;
+    const minFill = isLikelyBlankSheet ? 1 : approxMinFill;
     const minGap = approxMinGap;
 
     // Pass 2: Grade using adaptive thresholds
@@ -181,6 +185,11 @@ export class OmrLiteService {
     }
 
     return { gradingResults: results, studentHash };
+  }
+
+  public detectMarkersForPreview(data: Uint8ClampedArray, width: number, height: number): Point[] {
+    const markers = this.detectMarkers(data, width, height);
+    return markers.map((m) => m.center);
   }
 
   /**
@@ -264,10 +273,9 @@ export class OmrLiteService {
     return markers;
   }
 
-  private findBestSheetRectangle(points: Point[]): Point[] | null {
+  private findBestSheetRectangle(points: Point[], width: number, height: number): Point[] | null {
     if (points.length < 4) return null;
     
-    // Simple heuristic: find the 4 points that form the largest area
     // Sort by Y to split into Top and Bottom halves
     const sortedY = [...points].sort((a, b) => a.y - b.y);
     const topPoints = sortedY.slice(0, Math.ceil(points.length / 2)).sort((a, b) => a.x - b.x);
@@ -275,13 +283,36 @@ export class OmrLiteService {
     
     if (topPoints.length < 2 || bottomPoints.length < 2) return null;
     
-    // Return TL, TR, BR, BL
-    return [
-      topPoints[0], 
-      topPoints[topPoints.length - 1], 
-      bottomPoints[0], 
-      bottomPoints[bottomPoints.length - 1]
-    ];
+    // Candidate corners: TL, TR, BR, BL
+    const tl = topPoints[0];
+    const tr = topPoints[topPoints.length - 1];
+    const br = bottomPoints[0];
+    const bl = bottomPoints[bottomPoints.length - 1];
+    
+    // Validate this is a reasonable sheet rectangle:
+    // 1. TL must be in top-left region, TR in top-right, etc.
+    const margin = 0.15; // Each corner must be within 15% of its expected region
+    const w = width, h = height;
+    
+    const inRegion = (p: Point, xMin: number, xMax: number, yMin: number, yMax: number) =>
+      p.x >= xMin * w && p.x <= xMax * w && p.y >= yMin * h && p.y <= yMax * h;
+    
+    if (!inRegion(tl, 0, margin, 0, margin)) return null;
+    if (!inRegion(tr, 1 - margin, 1, 0, margin)) return null;
+    if (!inRegion(br, 1 - margin, 1, 1 - margin, 1)) return null;
+    if (!inRegion(bl, 0, margin, 1 - margin, 1)) return null;
+    
+    // 2. Aspect ratio should be roughly A4 (1:1.4) accounting for perspective
+    const rectW = Math.hypot(tr.x - tl.x, tr.y - tl.y) + Math.hypot(br.x - bl.x, br.y - bl.y);
+    const rectH = Math.hypot(bl.x - tl.x, bl.y - tl.y) + Math.hypot(br.x - tr.x, br.y - tr.y);
+    const aspect = rectW / rectH;
+    if (aspect < 0.5 || aspect > 1.2) return null; // A4 is ~0.7, allow some skew
+    
+    // 3. Minimum size - rectangle should cover at least 10% of frame area
+    const area = rectW * rectH / 2;
+    if (area < width * height * 0.10) return null;
+    
+    return [tl, tr, br, bl];
   }
 
   private getPaperWhite(data: Uint8ClampedArray, width: number, height: number, corners: Point[]): number {
@@ -303,20 +334,21 @@ export class OmrLiteService {
 
   /**
    * Find 4 nested square markers by looking in corner quadrants.
+   * Uses larger quadrants (45%) to detect markers even when camera is close.
    */
   private detectMarkers(data: Uint8ClampedArray, width: number, height: number): Marker[] {
     const markers: Marker[] = [];
-    // Quadrant margins (ignore edges)
-    const mX = Math.round(width * 0.05);
-    const mY = Math.round(height * 0.05);
-    const qW = Math.round(width * 0.35);
-    const qH = Math.round(height * 0.35);
+    // Larger quadrants (55%) to catch markers both when camera is close and when
+    // the sheet is slightly rotated / not perfectly centered.
+    // No margin - markers can be at the very edge of the frame
+    const qW = Math.round(width * 0.55);
+    const qH = Math.round(height * 0.55);
 
     const quadrants = [
-      { x1: mX, y1: mY, x2: qW, y2: qH },                       // TL
-      { x1: width - qW, y1: mY, x2: width - mX, y2: qH },       // TR
-      { x1: width - qW, y1: height - qH, x2: width - mX, y2: height - mY }, // BR
-      { x1: mX, y1: height - qH, x2: qW, y2: height - mY }      // BL
+      { x1: 0, y1: 0, x2: qW, y2: qH },                       // TL
+      { x1: width - qW, y1: 0, x2: width, y2: qH },           // TR
+      { x1: width - qW, y1: height - qH, x2: width, y2: height }, // BR
+      { x1: 0, y1: height - qH, x2: qW, y2: height }          // BL
     ];
 
     for (const quad of quadrants) {
@@ -324,102 +356,155 @@ export class OmrLiteService {
       if (marker) markers.push(marker);
     }
 
+    // Fallback: Only use global scan if we found at least 3 markers in quadrants.
+    // This prevents false positives when there's no paper at all.
+    // We need strong evidence of a real sheet before inferring missing corners.
+    if (markers.length === 3) {
+      const pts = this.findAllMarkersGlobal(data, width, height);
+      // Include the markers we already found
+      pts.push(...markers.map(m => m.center));
+      const best = this.findBestSheetRectangle(pts, width, height);
+      if (best && best.length === 4) {
+        return best.map((p) => ({
+          center: p,
+          rect: { x: p.x, y: p.y, w: 1, h: 1 }
+        }));
+      }
+    }
+
     return markers;
   }
 
   /**
    * Specifically looks for the nested square pattern (Black-White-Black)
+   * Relaxed thresholds for better detection on mobile cameras with varying lighting.
    */
   public findNestedMarker(data: Uint8ClampedArray, width: number, height: number, quad: any): Marker | null {
-    let sumX = 0, sumY = 0, count = 0;
     const x1 = Math.max(0, Math.floor(Number(quad?.x1 ?? 0)));
     const y1 = Math.max(0, Math.floor(Number(quad?.y1 ?? 0)));
     const x2 = Math.min(width, Math.ceil(Number(quad?.x2 ?? width)));
     const y2 = Math.min(height, Math.ceil(Number(quad?.y2 ?? height)));
 
-    let minX = x2, maxX = x1, minY = y2, maxY = y1;
-
-    // 1. First pass: find all dark pixels in the quadrant
-    // Use a slightly larger stride for real-time tracking performance
-    const stride = 3; // Reduced stride for better detection at distances
-    for (let y = y1; y < y2; y += stride) {
-      for (let x = x1; x < x2; x += stride) {
+    // Adaptive thresholds based on local brightness (handles glare / dim cameras).
+    // We sample sparsely to keep this cheap enough for real-time tracking.
+    let quadTotal = 0;
+    let quadCount = 0;
+    const sampleStride = 10;
+    for (let y = y1; y < y2; y += sampleStride) {
+      for (let x = x1; x < x2; x += sampleStride) {
         const idx = (Math.round(y) * width + Math.round(x)) * 4;
-        // More lenient black threshold for markers (up to 120 instead of 80)
-        if (data[idx] < 120 && data[idx + 1] < 120 && data[idx + 2] < 120) {
-          sumX += x; sumY += y; count++;
-          if (x < minX) minX = x; if (x > maxX) maxX = x;
-          if (y < minY) minY = y; if (y > maxY) maxY = y;
-        }
+        quadTotal += (data[idx] + data[idx + 1] + data[idx + 2]) / 3;
+        quadCount++;
       }
     }
+    const quadMean = quadCount > 0 ? quadTotal / quadCount : 160;
+    const darkThresh = Math.max(60, Math.min(150, quadMean * 0.68));
+    const lightThresh = Math.max(90, Math.min(220, quadMean * 0.88));
 
-    if (count < 6) return null; // Even more lenient count for distance
-
-    const centerX = (minX + maxX) / 2;
-    const centerY = (minY + maxY) / 2;
-    const w = maxX - minX;
-    const h = maxY - minY;
-
-    // Basic geometry sanity checks (prevents filled bubbles from being treated as markers)
-    const aspect = h > 0 ? (w / h) : 0;
-    if (aspect < 0.7 || aspect > 1.35) return null;
-    const size = Math.min(w, h);
-    if (size < 10) return null;
-
-    // 2. Second pass: Validate the "Nested" pattern at the center
-    // Check center
-    const innerIdx = (Math.round(centerY) * width + Math.round(centerX)) * 4;
-    const isInnerBlack = data[innerIdx] < 130; // More lenient
-
-    // Check ring with multiple sample points for reliability
-    const offsets = [
-      {dx: 0.35, dy: 0}, {dx: -0.35, dy: 0}, {dx: 0, dy: 0.35}, {dx: 0, dy: -0.35}
-    ];
-    
-    let whitePoints = 0;
-    for (const offset of offsets) {
-      const rx = Math.round(centerX + w * offset.dx);
-      const ry = Math.round(centerY + h * offset.dy);
-      if (rx >= 0 && rx < width && ry >= 0 && ry < height) {
-        const ridx = (ry * width + rx) * 4;
-        if (data[ridx] > 130) whitePoints++; // More lenient white threshold
-      }
-    }
-
-    // Additionally validate outer black border further away from the center.
-    // This helps reject filled bubbles (which don't have an outer black square beyond the circle).
-    const outerOffsets = [
-      {dx: 0.65, dy: 0}, {dx: -0.65, dy: 0}, {dx: 0, dy: 0.65}, {dx: 0, dy: -0.65}
-    ];
-    let outerBlackPoints = 0;
-    for (const offset of outerOffsets) {
-      const rx = Math.round(centerX + w * offset.dx);
-      const ry = Math.round(centerY + h * offset.dy);
-      if (rx >= 0 && rx < width && ry >= 0 && ry < height) {
-        const ridx = (ry * width + rx) * 4;
-        const b = (data[ridx] + data[ridx + 1] + data[ridx + 2]) / 3;
-        if (b < 120) outerBlackPoints++;
-      }
-    }
-
-    // If at least 2 points match the "white ring" AND at least 2 match outer black, accept it.
-    if (!isInnerBlack || whitePoints < 2 || outerBlackPoints < 2) return null;
-
-    return {
-      center: { x: centerX, y: centerY },
-      rect: { x: minX, y: minY, w, h }
+    const getBrightness = (x: number, y: number) => {
+      const idx = (y * width + x) * 4;
+      return (data[idx] + data[idx + 1] + data[idx + 2]) / 3;
     };
+
+    const checkCandidate = (cx: number, cy: number): { marker: Marker; score: number } | null => {
+      if (cx < 2 || cy < 2 || cx >= width - 2 || cy >= height - 2) return null;
+
+      const c = getBrightness(cx, cy);
+      if (c > darkThresh + 10) return null;
+
+      const maxStep = 40;
+      const dirs: Array<{ dx: number; dy: number }> = [
+        { dx: 1, dy: 0 },
+        { dx: -1, dy: 0 },
+        { dx: 0, dy: 1 },
+        { dx: 0, dy: -1 }
+      ];
+
+      const d1s: number[] = [];
+      const d2s: number[] = [];
+      const d3s: number[] = [];
+
+      for (const d of dirs) {
+        let d1 = -1;
+        let d2 = -1;
+        let d3 = -1;
+
+        for (let s = 1; s <= maxStep; s++) {
+          const x = cx + d.dx * s;
+          const y = cy + d.dy * s;
+          if (x <= 1 || y <= 1 || x >= width - 2 || y >= height - 2) break;
+          const b = getBrightness(x, y);
+          if (d1 < 0) {
+            if (b > lightThresh) d1 = s;
+          } else if (d2 < 0) {
+            if (b < darkThresh) d2 = s;
+          } else {
+            if (b > lightThresh) {
+              d3 = s;
+              break;
+            }
+          }
+        }
+
+        if (d1 < 2 || d2 < 0 || d3 < 0) return null;
+        if (d2 - d1 < 1 || d3 - d2 < 1) return null;
+
+        d1s.push(d1);
+        d2s.push(d2);
+        d3s.push(d3);
+      }
+
+      const outerR = Math.round((d3s[0] + d3s[1] + d3s[2] + d3s[3]) / 4);
+      if (outerR < 6) return null;
+
+      const minX = Math.max(x1, cx - outerR);
+      const maxX = Math.min(x2 - 1, cx + outerR);
+      const minY = Math.max(y1, cy - outerR);
+      const maxY = Math.min(y2 - 1, cy + outerR);
+      const w = Math.max(1, maxX - minX);
+      const h = Math.max(1, maxY - minY);
+
+      const aspect = h > 0 ? (w / h) : 0;
+      if (aspect < 0.6 || aspect > 1.5) return null;
+      const size = Math.min(w, h);
+      if (size < 8) return null;
+
+      const spread = Math.max(...d3s) - Math.min(...d3s);
+      const score = size - spread * 2;
+
+      return {
+        marker: {
+          center: { x: cx, y: cy },
+          rect: { x: minX, y: minY, w, h }
+        },
+        score
+      };
+    };
+
+    let best: { marker: Marker; score: number } | null = null;
+
+    const stride = 6;
+    for (let y = y1 + 2; y < y2 - 2; y += stride) {
+      for (let x = x1 + 2; x < x2 - 2; x += stride) {
+        const b = getBrightness(x, y);
+        if (b > darkThresh) continue;
+
+        const cand = checkCandidate(x, y);
+        if (!cand) continue;
+        if (!best || cand.score > best.score) best = cand;
+      }
+    }
+
+    return best ? best.marker : null;
   }
 
   /**
    * Helper to get standard quadrants for detection
+   * Uses 45% coverage to match detectMarkers() for consistent live/capture behavior
    */
   public getQuadrants(width: number, height: number) {
-    const mX = Math.round(width * 0.05);
-    const mY = Math.round(height * 0.05);
-    const qW = Math.round(width * 0.4);
-    const qH = Math.round(height * 0.4);
+    const qW = Math.round(width * 0.45);
+    const qH = Math.round(height * 0.45);
 
     return [
       { id: 'tl', x1: 0, y1: 0, x2: qW, y2: qH },                       // TL

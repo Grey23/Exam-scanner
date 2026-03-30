@@ -1,9 +1,9 @@
 // ============================
-// SIDEBAR / MENU STYLES - Updated for consistency
+// DESIGN SYSTEM - Matching Login Page Style
 // ============================
-$primary-color: #667eea;
-$primary-light: #7c8cff;
-$primary-dark: #764ba2;
+$primary-color: #2563eb;
+$primary-light: #3b82f6;
+$primary-dark: #1d4ed8;
 $accent-color: #f97316;
 $success-color: #10b981;
 $warning-color: #f59e0b;
@@ -11,16 +11,19 @@ $danger-color: #ef4444;
 $info-color: #06b6d4;
 $secondary-color: #8b5cf6;
 
-$text-primary: #1f2937;
-$text-secondary: #6b7280;
+$text-primary: #0f172a;
+$text-secondary: #64748b;
 $text-light: #f3f4f6;
-$bg-light: #f5f7fa;
+$bg-light: #eff6ff;
 $bg-white: #ffffff;
 $border-color: #e5e7eb;
 
+// ============================
+// SIDEBAR / MENU STYLES
+// ============================
 .teacher-menu {
   --width: 280px;
-  --background: linear-gradient(180deg, #f5f7fa 0%, #ffffff 100%);
+  --background: linear-gradient(180deg, #eff6ff 0%, #ffffff 100%);
 
   ion-header {
     box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
@@ -28,7 +31,7 @@ $border-color: #e5e7eb;
 }
 
 .menu-header {
-  --background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  --background: linear-gradient(135deg, #2563eb 0%, #3b82f6 100%);
   --color: white;
   padding-top: 12px;
   padding-bottom: 12px;
@@ -45,12 +48,12 @@ $border-color: #e5e7eb;
   --padding-bottom: 0;
   --padding-start: 0;
   --padding-end: 0;
-  background: linear-gradient(180deg, #f5f7fa 0%, #ffffff 100%);
+  background: linear-gradient(180deg, #eff6ff 0%, #ffffff 100%);
 }
 
-// User Profile Section - Updated
+// User Profile Section
 .user-profile-section {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: linear-gradient(135deg, #2563eb 0%, #3b82f6 100%);
   padding: 24px 16px;
   color: white;
   text-align: center;
@@ -112,7 +115,7 @@ $border-color: #e5e7eb;
   text-transform: uppercase;
   font-size: 12px;
   font-weight: 700;
-  color: #667eea;
+  color: #2563eb;
   letter-spacing: 1px;
   padding: 16px 0 12px 16px;
 }
@@ -138,7 +141,7 @@ $border-color: #e5e7eb;
 
   .menu-icon {
     font-size: 22px;
-    color: #667eea;
+    color: #2563eb;
     margin-right: 4px;
   }
 
@@ -148,11 +151,11 @@ $border-color: #e5e7eb;
   }
 
   &:hover {
-    --background: linear-gradient(135deg, rgba(102, 126, 234, 0.1) 0%, rgba(118, 75, 162, 0.1) 100%);
+    --background: rgba(37, 99, 235, 0.1);
   }
 
   &:active {
-    --background: linear-gradient(135deg, rgba(102, 126, 234, 0.15) 0%, rgba(118, 75, 162, 0.15) 100%);
+    --background: rgba(37, 99, 235, 0.15);
   }
 }
 
@@ -160,20 +163,20 @@ $border-color: #e5e7eb;
   margin-top: 12px;
 
   ion-label {
-    color: #e74c3c;
+    color: #ef4444;
   }
 
   .menu-icon {
-    color: #e74c3c;
+    color: #ef4444;
   }
 
   &:hover {
-    --background: rgba(231, 76, 60, 0.1);
+    --background: rgba(239, 68, 68, 0.1);
   }
 }
 
 .menu-divider {
-  background: linear-gradient(90deg, transparent 0%, #e0e0e0 50%, transparent 100%);
+  background: linear-gradient(90deg, transparent 0%, #e5e7eb 50%, transparent 100%);
   height: 1px;
   border: none;
   margin: 8px 0;
@@ -183,11 +186,13 @@ $border-color: #e5e7eb;
 // HEADER STYLES
 // ============================
 .teacher-header {
-  --background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  --background: linear-gradient(135deg, #2563eb 0%, #3b82f6 100%);
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
   position: sticky;
   top: 0;
   z-index: 99;
+  // Safe area padding for mobile devices (dynamic island)
+  padding-top: env(safe-area-inset-top);
 }
 
 .header-toolbar {
@@ -219,19 +224,23 @@ $border-color: #e5e7eb;
 }
 
 // ============================
-// MAIN CONTENT STYLES
+// MAIN CONTENT STYLES - Matching Login Page Background
 // ============================
 .teacher-dashboard-content {
-  --background: linear-gradient(180deg, #{$bg-light} 0%, #{$bg-white} 50%, #{$bg-light} 100%);
+  --background: linear-gradient(135deg, #eff6ff 0%, #dbeafe 50%, #bfdbfe 100%);
   padding: 0;
+  // Safe area padding for mobile devices
+  --padding-bottom: env(safe-area-inset-bottom);
 }
 
 // Header Card
 .header-card {
-  background: linear-gradient(135deg, #{$primary-color} 0%, #{$primary-dark} 100%);
+  background: linear-gradient(135deg, #2563eb 0%, #3b82f6 100%);
   color: #{$text-light};
   padding: 32px 20px 20px;
   margin: 0;
+  // Safe area for dynamic island
+  padding-top: calc(32px + env(safe-area-inset-top));
 
   .greeting {
     h1 {
@@ -252,6 +261,7 @@ $border-color: #e5e7eb;
 
 .dashboard-container {
   padding: 20px;
+  padding-bottom: calc(20px + env(safe-area-inset-bottom));
 }
 
 // ============================
@@ -360,7 +370,7 @@ $border-color: #e5e7eb;
     right: 0;
     width: 100px;
     height: 100px;
-    background: radial-gradient(circle, rgba(59, 130, 246, 0.05) 0%, transparent 70%);
+    background: radial-gradient(circle, rgba(37, 99, 235, 0.05) 0%, transparent 70%);
     border-radius: 50%;
   }
 
@@ -382,7 +392,7 @@ $border-color: #e5e7eb;
   &.classes {
     border-top-color: #{$primary-light};
     .stat-icon {
-      background: rgba(59, 130, 246, 0.1);
+      background: rgba(37, 99, 235, 0.1);
       color: #{$primary-light};
     }
   }
@@ -463,8 +473,112 @@ $border-color: #e5e7eb;
       transform: translateY(-50%);
       width: 4px;
       height: 24px;
-      background: linear-gradient(135deg, #{$primary-light}, #{$accent-color});
+      background: linear-gradient(135deg, #{$primary-color}, #{$primary-light});
       border-radius: 2px;
+    }
+  }
+}
+
+// ============================
+// TOTALS STATS GRID - Matching Classes/Students Design
+// ============================
+.totals-stats-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 12px;
+  margin-bottom: 20px;
+
+  .stat-card {
+    background: #{$bg-white};
+    border-radius: 12px;
+    padding: 16px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    border-top: 4px solid #{$primary-color};
+    position: relative;
+    overflow: hidden;
+
+    &::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      right: 0;
+      width: 100px;
+      height: 100px;
+      background: radial-gradient(circle, rgba(37, 99, 235, 0.05) 0%, transparent 70%);
+      border-radius: 50%;
+    }
+
+    .stat-icon {
+      width: 48px;
+      height: 48px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin-bottom: 12px;
+      font-size: 24px;
+
+      ion-icon {
+        font-size: 24px;
+      }
+    }
+
+    &.scans {
+      border-top-color: #{$info-color};
+      .stat-icon {
+        background: rgba(6, 182, 212, 0.1);
+        color: #{$info-color};
+      }
+    }
+
+    &.questions {
+      border-top-color: #{$secondary-color};
+      .stat-icon {
+        background: rgba(139, 92, 246, 0.1);
+        color: #{$secondary-color};
+      }
+    }
+
+    &.accuracy {
+      border-top-color: #{$success-color};
+      .stat-icon {
+        background: rgba(16, 185, 129, 0.1);
+        color: #{$success-color};
+      }
+    }
+
+    .stat-info {
+      width: 100%;
+      position: relative;
+      z-index: 1;
+
+      h3 {
+        margin: 0;
+        font-size: 24px;
+        font-weight: 700;
+        color: #{$text-primary};
+      }
+
+      p {
+        margin: 4px 0 0 0;
+        font-size: 12px;
+        color: #{$text-secondary};
+        font-weight: 500;
+      }
+    }
+
+    &:hover {
+      transform: translateY(-4px);
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+    }
+
+    &:active {
+      transform: translateY(-2px);
     }
   }
 }
@@ -1113,6 +1227,7 @@ $border-color: #e5e7eb;
 
     .section-header h2 {
       font-size: 16px;
+      color: #2196F3; // new blue color scheme
     }
   }
 
@@ -1122,6 +1237,7 @@ $border-color: #e5e7eb;
 
   .section-header h2 {
     font-size: 16px;
+    color: #2196F3; // new blue color scheme
   }
 }
 

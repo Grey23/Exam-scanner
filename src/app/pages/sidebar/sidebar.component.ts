@@ -1,6 +1,6 @@
 import { Component, Input, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { IonicModule, MenuController, NavController } from '@ionic/angular';
+import { IonicModule, MenuController, NavController, AlertController } from '@ionic/angular';
 import { AuthService, User } from '../../services/auth.service';
 
 @Component({
@@ -20,7 +20,8 @@ export class SidebarComponent {
   constructor(
     private navCtrl: NavController,
     private menuController: MenuController,
-    private authService: AuthService
+    private authService: AuthService,
+    private alertController: AlertController
   ) {
     this.currentUser = this.authService.getCurrentUser();
   }
@@ -67,8 +68,38 @@ export class SidebarComponent {
   }
 
   async logout() {
-    await this.closeMenu();
-    await this.authService.logout();
-    this.navCtrl.navigateRoot('/login');
+    const alert = await this.alertController.create({
+      header: 'Logout',
+      message: 'Are you sure you want to logout?',
+      buttons: [
+        {
+          text: 'No',
+          role: 'cancel'
+        },
+        {
+          text: 'Yes',
+          handler: async () => {
+            try {
+              await this.closeMenu();
+            } catch {
+              // ignore menu close errors
+            }
+            
+            try {
+              await this.authService.logout();
+            } catch (err) {
+              console.error('Logout error:', err);
+            }
+            
+            // Always navigate to login with logout param, even if logout fails
+            this.navCtrl.navigateRoot('/login', {
+              queryParams: { logout: 'true' }
+            });
+          }
+        }
+      ]
+    });
+
+    await alert.present();
   }
 }

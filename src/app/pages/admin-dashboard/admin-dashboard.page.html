@@ -1,78 +1,4 @@
-<ion-menu side="start" menuId="main" contentId="main-content" class="admin-menu">
-  <ion-header>
-    <ion-toolbar color="primary" class="menu-header">
-      <ion-title class="menu-title">ExamScanner</ion-title>
-    </ion-toolbar>
-  </ion-header>
-  <ion-content class="menu-content">
-    <!-- User Profile Section -->
-    <div class="user-profile-section">
-      <div class="user-avatar-container">
-        <div class="user-avatar admin-avatar">{{ currentUser?.name?.charAt(0)?.toUpperCase() }}</div>
-      </div>
-      <div class="user-info">
-        <h2 class="user-name">{{ currentUser?.name }}</h2>
-        <p class="user-email">{{ currentUser?.email }}</p>
-        <span class="user-role admin-role">Admin</span>
-      </div>
-    </div>
-
-    <!-- Menu Items -->
-    <ion-list class="menu-list">
-      <ion-list-header class="menu-section-header">
-        <ion-label>Navigation</ion-label>
-      </ion-list-header>
-
-      <ion-item (click)="goToDashboard()" button class="menu-item">
-        <ion-icon name="home-outline" slot="start" class="menu-icon"></ion-icon>
-        <ion-label>Dashboard</ion-label>
-        <ion-icon name="chevron-forward-outline" slot="end" class="chevron"></ion-icon>
-      </ion-item>
-
-      <ion-item (click)="goToClasses()" button class="menu-item">
-        <ion-icon name="school-outline" slot="start" class="menu-icon"></ion-icon>
-        <ion-label>Manage Classes</ion-label>
-        <ion-icon name="chevron-forward-outline" slot="end" class="chevron"></ion-icon>
-      </ion-item>
-
-      <ion-item (click)="goToTeachers()" button class="menu-item">
-        <ion-icon name="people-outline" slot="start" class="menu-icon"></ion-icon>
-        <ion-label>Teachers</ion-label>
-        <ion-icon name="chevron-forward-outline" slot="end" class="chevron"></ion-icon>
-      </ion-item>
-
-      <ion-list-header class="menu-section-header">
-        <ion-label>Tools</ion-label>
-      </ion-list-header>
-
-      <ion-item (click)="goToScan()" button class="menu-item">
-        <ion-icon name="camera-outline" slot="start" class="menu-icon"></ion-icon>
-        <ion-label>Scan Answers</ion-label>
-        <ion-icon name="chevron-forward-outline" slot="end" class="chevron"></ion-icon>
-      </ion-item>
-
-      <ion-item (click)="goToResults()" button class="menu-item">
-        <ion-icon name="bar-chart-outline" slot="start" class="menu-icon"></ion-icon>
-        <ion-label>View Results</ion-label>
-        <ion-icon name="chevron-forward-outline" slot="end" class="chevron"></ion-icon>
-      </ion-item>
-
-      <ion-item (click)="goToSchoolSettings()" button class="menu-item">
-        <ion-icon name="settings-outline" slot="start" class="menu-icon"></ion-icon>
-        <ion-label>School Settings</ion-label>
-        <ion-icon name="chevron-forward-outline" slot="end" class="chevron"></ion-icon>
-      </ion-item>
-
-      <ion-item-divider class="menu-divider"></ion-item-divider>
-
-      <ion-item (click)="logout()" button class="menu-item logout-item">
-        <ion-icon name="log-out-outline" slot="start" class="menu-icon"></ion-icon>
-        <ion-label>Logout</ion-label>
-        <ion-icon name="chevron-forward-outline" slot="end" class="chevron"></ion-icon>
-      </ion-item>
-    </ion-list>
-  </ion-content>
-</ion-menu>
+<app-admin-sidebar menuId="main" contentId="main-content" activePage="dashboard"></app-admin-sidebar>
 
 <ion-header class="admin-header">
   <ion-toolbar color="primary" class="header-toolbar">
@@ -91,296 +17,136 @@
 </ion-header>
 
 <ion-content id="main-content" class="admin-dashboard-content">
-  <!-- Header Card -->
   <div class="header-card">
     <div class="greeting">
       <h1>Welcome Back, {{ currentUser?.name }}!</h1>
-      <p>Manage your school, teachers, and exams efficiently</p>
+      <p>Monitor key platform metrics</p>
     </div>
   </div>
 
-  <div *ngIf="!isLoading" class="dashboard-container">
-    <!-- Stats Section -->
-    <div class="stats-section" *ngIf="dashboardStats">
+  <div class="dashboard-container">
+    <div *ngIf="!isLoading" class="stats-section">
+      <div class="stat-card users">
+        <div class="stat-icon">
+          <ion-icon name="people-circle-outline"></ion-icon>
+        </div>
+        <div class="stat-info">
+          <h3>{{ totalUsers }}</h3>
+          <p>Total Users</p>
+        </div>
+      </div>
+
       <div class="stat-card classes">
         <div class="stat-icon">
-          <ion-icon name="school"></ion-icon>
+          <ion-icon name="person-outline"></ion-icon>
         </div>
         <div class="stat-info">
-          <h3>{{ dashboardStats.totalClasses }}</h3>
-          <p>Classes</p>
-        </div>
-      </div>
-
-      <div class="stat-card students">
-        <div class="stat-icon">
-          <ion-icon name="people"></ion-icon>
-        </div>
-        <div class="stat-info">
-          <h3>{{ dashboardStats.totalStudents }}</h3>
-          <p>Students</p>
-        </div>
-      </div>
-
-      <div class="stat-card subjects">
-        <div class="stat-icon">
-          <ion-icon name="book"></ion-icon>
-        </div>
-        <div class="stat-info">
-          <h3>{{ dashboardStats.totalSubjects }}</h3>
-          <p>Subjects</p>
+          <h3>{{ totalTeachers }}</h3>
+          <p>Teachers</p>
         </div>
       </div>
 
       <div class="stat-card average">
         <div class="stat-icon">
-          <ion-icon name="trending-up"></ion-icon>
+          <ion-icon name="shield-checkmark-outline"></ion-icon>
         </div>
         <div class="stat-info">
-          <h3>{{ dashboardStats.averageScore | number: '1.1-1' }}%</h3>
-          <p>Avg Score</p>
+          <h3>{{ totalAdmins }}</h3>
+          <p>Admins</p>
+        </div>
+      </div>
+
+      <div class="stat-card classes">
+        <div class="stat-icon">
+          <ion-icon name="school-outline"></ion-icon>
+        </div>
+        <div class="stat-info">
+          <h3>{{ totalClasses }}</h3>
+          <p>Classes Created</p>
+        </div>
+      </div>
+
+      <div class="stat-card users">
+        <div class="stat-icon">
+          <ion-icon name="help-circle-outline"></ion-icon>
+        </div>
+        <div class="stat-info">
+          <h3>{{ questionsGeneratedToday }}</h3>
+          <p>Questions Generated Today</p>
+        </div>
+      </div>
+
+      <div class="stat-card average">
+        <div class="stat-icon">
+          <ion-icon name="document-text-outline"></ion-icon>
+        </div>
+        <div class="stat-info">
+          <h3>{{ totalScannedPapers }}</h3>
+          <p>Scanned Papers</p>
         </div>
       </div>
     </div>
 
-    <!-- Admin Actions -->
-    <div class="quick-actions">
+    <div *ngIf="isLoading" class="loading-container">
+      <ion-spinner name="crescent"></ion-spinner>
+      <p>Loading dashboard...</p>
+    </div>
+
+    <!-- Charts Section -->
+    <div class="charts-section" *ngIf="!isLoading">
       <div class="section-header">
-        <h2>Admin Actions</h2>
+        <h2>Analytics Overview</h2>
       </div>
-      <div class="action-grid">
-        <div class="action-card manage-classes" (click)="goToClasses()">
-          <div class="card-icon-wrapper">
-            <ion-icon name="list" class="card-icon"></ion-icon>
-          </div>
-          <h3>Manage Classes</h3>
-          <p>View and manage all classes</p>
-        </div>
-
-        <div class="action-card teachers" (click)="goToTeachers()">
-          <div class="card-icon-wrapper">
-            <ion-icon name="people" class="card-icon"></ion-icon>
-          </div>
-          <h3>Teachers</h3>
-          <p>Manage school teachers</p>
-        </div>
-
-        <div class="action-card scan-answers" (click)="goToScan()">
-          <div class="card-icon-wrapper">
-            <ion-icon name="camera" class="card-icon"></ion-icon>
-          </div>
-          <h3>Scan Answers</h3>
-          <p>Scan and process sheets</p>
-        </div>
-
-        <div class="action-card view-results" (click)="goToResults()">
-          <div class="card-icon-wrapper">
-            <ion-icon name="bar-chart" class="card-icon"></ion-icon>
-          </div>
-          <h3>View Results</h3>
-          <p>Check all exam results</p>
-        </div>
-
-        <div class="action-card settings">
-          <div class="card-icon-wrapper">
-            <ion-icon name="settings" class="card-icon"></ion-icon>
-          </div>
-          <h3>School Settings</h3>
-          <p>Configure school info</p>
-        </div>
-
-        <div class="action-card reports">
-          <div class="card-icon-wrapper">
-            <ion-icon name="download" class="card-icon"></ion-icon>
-          </div>
-          <h3>Generate Report</h3>
-          <p>Export school reports</p>
-        </div>
-      </div>
-    </div>
-
-    <!-- Recent Activity -->
-    <div class="recent-activity" *ngIf="dashboardStats && dashboardStats.recentScans.length > 0">
-      <div class="section-header">
-        <h2>Recent Exams</h2>
-      </div>
-      <ion-list class="activity-list">
-        <ion-item *ngFor="let scan of dashboardStats.recentScans" lines="inset" class="activity-item">
-          <ion-icon name="document" slot="start" class="activity-icon"></ion-icon>
-          <ion-label>
-            <h2>{{ scan.className }}</h2>
-            <p>{{ scan.subjectName }} • {{ scan.date }}</p>
-          </ion-label>
-          <ion-icon name="chevron-forward-outline" slot="end"></ion-icon>
-        </ion-item>
-      </ion-list>
-    </div>
-
-    <!-- Class Performance -->
-    <div class="performance-section" *ngIf="dashboardStats && dashboardStats.classPerformance.length > 0">
-      <div class="section-header">
-        <h2>Class Performance</h2>
-      </div>
-      <ion-card *ngFor="let classPerf of dashboardStats.classPerformance" class="performance-card">
-        <ion-card-header class="perf-header">
-          <div class="perf-title">
-            <ion-card-title>{{ classPerf.className }}</ion-card-title>
-            <ion-card-subtitle>{{ classPerf.studentCount }} students</ion-card-subtitle>
-          </div>
-        </ion-card-header>
-        <ion-card-content>
-          <div class="performance-stats">
-            <div class="stat-item">
-              <span>Average</span>
-              <strong class="avg">{{ classPerf.averageScore }}%</strong>
+      
+      <div class="charts-grid">
+        <!-- Users Breakdown Chart -->
+        <ion-card class="chart-card">
+          <ion-card-header>
+            <ion-card-title>Users Breakdown</ion-card-title>
+          </ion-card-header>
+          <ion-card-content>
+            <div class="chart-container">
+              <canvas id="adminUsersChart"></canvas>
             </div>
-            <div class="stat-item">
-              <span>Highest</span>
-              <strong class="high">{{ classPerf.highestScore }}%</strong>
+          </ion-card-content>
+        </ion-card>
+
+        <!-- Activity Trends Chart -->
+        <ion-card class="chart-card">
+          <ion-card-header>
+            <ion-card-title>Weekly Activity</ion-card-title>
+          </ion-card-header>
+          <ion-card-content>
+            <div class="chart-container">
+              <canvas id="adminActivityChart"></canvas>
             </div>
-            <div class="stat-item">
-              <span>Lowest</span>
-              <strong class="low">{{ classPerf.lowestScore }}%</strong>
+          </ion-card-content>
+        </ion-card>
+
+        <!-- Scans Distribution Chart -->
+        <ion-card class="chart-card">
+          <ion-card-header>
+            <ion-card-title>Scans Distribution</ion-card-title>
+          </ion-card-header>
+          <ion-card-content>
+            <div class="chart-container">
+              <canvas id="adminScansChart"></canvas>
             </div>
-          </div>
-          <div class="progress-bar">
-            <div class="progress" [style.width.%]="classPerf.averageScore"></div>
-          </div>
-        </ion-card-content>
-      </ion-card>
-    </div>
+          </ion-card-content>
+        </ion-card>
 
-  <!-- Loading -->
-  <div *ngIf="isLoading" class="loading-container">
-    <ion-spinner name="crescent"></ion-spinner>
-    <p>Loading your dashboard...</p>
-  </div>
-
-    <!-- Stats Section -->
-    <div class="stats-section" *ngIf="dashboardStats">
-      <div class="stat-card">
-        <ion-icon name="school-outline"></ion-icon>
-        <div class="stat-info">
-          <h3>{{ dashboardStats.totalClasses }}</h3>
-          <p>Classes</p>
-        </div>
-      </div>
-
-      <div class="stat-card">
-        <ion-icon name="people-outline"></ion-icon>
-        <div class="stat-info">
-          <h3>{{ dashboardStats.totalStudents }}</h3>
-          <p>Students</p>
-        </div>
-      </div>
-
-      <div class="stat-card">
-        <ion-icon name="book-outline"></ion-icon>
-        <div class="stat-info">
-          <h3>{{ dashboardStats.totalSubjects }}</h3>
-          <p>Subjects</p>
-        </div>
-      </div>
-
-      <div class="stat-card">
-        <ion-icon name="stats-chart-outline"></ion-icon>
-        <div class="stat-info">
-          <h3>{{ dashboardStats.averageScore | number: '1.1-1' }}%</h3>
-          <p>Avg Score</p>
-        </div>
+        <!-- Questions Generated Chart -->
+        <ion-card class="chart-card">
+          <ion-card-header>
+            <ion-card-title>Questions Generated</ion-card-title>
+          </ion-card-header>
+          <ion-card-content>
+            <div class="chart-container">
+              <canvas id="adminQuestionsChart"></canvas>
+            </div>
+          </ion-card-content>
+        </ion-card>
       </div>
     </div>
-
-    <!-- Quick Actions -->
-    <div class="quick-actions">
-      <h2>Admin Actions</h2>
-      <div class="action-grid">
-        <div class="action-card" (click)="goToClasses()">
-          <ion-icon name="list-outline" color="primary"></ion-icon>
-          <h3>Manage Classes</h3>
-          <p>View and manage all classes</p>
-        </div>
-
-        <div class="action-card" (click)="goToTeachers()">
-          <ion-icon name="people-outline" color="warning"></ion-icon>
-          <h3>Teachers</h3>
-          <p>Manage school teachers</p>
-        </div>
-
-        <div class="action-card" (click)="goToScan()">
-          <ion-icon name="camera-outline" color="danger"></ion-icon>
-          <h3>Scan Answers</h3>
-          <p>Scan and process answer sheets</p>
-        </div>
-
-        <div class="action-card" (click)="goToResults()">
-          <ion-icon name="bar-chart-outline" color="success"></ion-icon>
-          <h3>View Results</h3>
-          <p>Check all exam results</p>
-        </div>
-
-        <div class="action-card" (click)="goToSchoolSettings()">
-          <ion-icon name="settings-outline" color="secondary"></ion-icon>
-          <h3>School Settings</h3>
-          <p>Configure school information</p>
-        </div>
-
-        <div class="action-card">
-          <ion-icon name="download-outline" color="medium"></ion-icon>
-          <h3>Generate Report</h3>
-          <p>Export school performance reports</p>
-        </div>
-      </div>
-    </div>
-
-    <!-- Recent Activity -->
-    <div class="recent-activity" *ngIf="dashboardStats && dashboardStats.recentScans.length > 0">
-      <h2>Recent Exams</h2>
-      <ion-list>
-        <ion-item *ngFor="let scan of dashboardStats.recentScans" lines="inset">
-          <ion-icon name="document-outline" slot="start"></ion-icon>
-          <ion-label>
-            <h2>{{ scan.className }}</h2>
-            <p>{{ scan.subjectName }} • {{ scan.date }}</p>
-          </ion-label>
-        </ion-item>
-      </ion-list>
-    </div>
-
-    <!-- Class Performance -->
-    <div class="performance-section" *ngIf="dashboardStats && dashboardStats.classPerformance.length > 0">
-      <h2>Class Performance</h2>
-      <ion-card *ngFor="let classPerf of dashboardStats.classPerformance" class="performance-card">
-        <ion-card-header>
-          <ion-card-title>{{ classPerf.className }}</ion-card-title>
-          <ion-card-subtitle>{{ classPerf.studentCount }} students</ion-card-subtitle>
-        </ion-card-header>
-        <ion-card-content>
-          <div class="performance-stats">
-            <div class="stat-item">
-              <span>Average</span>
-              <strong>{{ classPerf.averageScore }}%</strong>
-            </div>
-            <div class="stat-item">
-              <span>Highest</span>
-              <strong class="high">{{ classPerf.highestScore }}%</strong>
-            </div>
-            <div class="stat-item">
-              <span>Lowest</span>
-              <strong class="low">{{ classPerf.lowestScore }}%</strong>
-            </div>
-          </div>
-          <div class="progress-bar">
-            <div class="progress" [style.width.%]="classPerf.averageScore"></div>
-          </div>
-        </ion-card-content>
-      </ion-card>
-    </div>
-  </div>
-
-  <!-- Loading -->
-  <div *ngIf="isLoading" class="loading-container">
-    <ion-spinner name="crescent"></ion-spinner>
-    <p>Loading your dashboard...</p>
   </div>
 </ion-content>

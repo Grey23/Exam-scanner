@@ -33,6 +33,7 @@ export class QuestionGeneratorPage implements OnInit {
     question: string;
     choices: { A: string; B: string; C: string; D: string };
     answer: 'A' | 'B' | 'C' | 'D' | '';
+    hidden?: boolean;
   }[] = [];
 
   displayQuestions: {
@@ -42,6 +43,7 @@ export class QuestionGeneratorPage implements OnInit {
     question: string;
     choices: { A: string; B: string; C: string; D: string };
     answer: 'A' | 'B' | 'C' | 'D' | '';
+    hidden?: boolean;
   }[] = [];
 
   isGeneratingAI = false;
@@ -172,11 +174,13 @@ export class QuestionGeneratorPage implements OnInit {
 
   private refreshDisplayQuestions() {
     const selected = String(this.selectedTopic || '').trim();
+    // Filter out hidden questions (hidden: true means they should not be shown)
+    const visibleQuestions = (this.questions || []).filter((q) => !q?.hidden);
     if (this.topicViewMode === 'selected' && selected) {
       // Filter view only; do NOT mutate original questions.
-      this.displayQuestions = (this.questions || []).filter((q) => String(q?.topic || '').trim() === selected);
+      this.displayQuestions = visibleQuestions.filter((q) => String(q?.topic || '').trim() === selected);
     } else {
-      this.displayQuestions = this.questions || [];
+      this.displayQuestions = visibleQuestions;
     }
   }
 

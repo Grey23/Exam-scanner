@@ -1,20 +1,20 @@
 // ============================
-// PROFESSIONAL COLOR PALETTE (Admin - Darker tones)
+// DESIGN SYSTEM - Matching Login Page Style
 // ============================
-$primary-color: #15803d;      // Deep Forest Green
-$primary-light: #22c55e;      // Bright Green
-$primary-dark: #166534;       // Darker Green
-$accent-color: #dc2626;       // Vibrant Red
+$primary-color: #2563eb;      // Blue
+$primary-light: #3b82f6;     // Light Blue
+$primary-dark: #1d4ed8;      // Dark Blue
+$accent-color: #f97316;      // Orange
 $success-color: #10b981;      // Emerald Green
 $warning-color: #f59e0b;      // Amber
 $danger-color: #ef4444;       // Red
 $info-color: #06b6d4;         // Cyan
 $secondary-color: #8b5cf6;    // Purple
 
-$text-primary: #1f2937;       // Dark Gray
-$text-secondary: #6b7280;     // Medium Gray
+$text-primary: #0f172a;       // Dark Slate
+$text-secondary: #64748b;     // Slate Gray
 $text-light: #f3f4f6;         // Light Gray
-$bg-light: #f9fafb;           // Very Light Gray
+$bg-light: #eff6ff;           // Light Blue Tint
 $bg-white: #ffffff;           // White
 $border-color: #e5e7eb;       // Border Gray
 
@@ -160,7 +160,7 @@ $border-color: #e5e7eb;       // Border Gray
   &:active {
     --background: #{$bg-light};
     --color: #{$primary-color};
-    border-start-color: #{$primary-color};
+    border-left-color: #{$primary-color};
 
     .menu-icon {
       color: #{$primary-light};
@@ -177,7 +177,7 @@ $border-color: #e5e7eb;       // Border Gray
   &:active {
     --background: rgba(239, 68, 68, 0.1);
     --color: #{$danger-color};
-    border-start-color: #{$danger-color};
+    border-left-color: #{$danger-color};
 
     .menu-icon {
       color: #{$danger-color};
@@ -194,11 +194,13 @@ $border-color: #e5e7eb;       // Border Gray
 // HEADER STYLES
 // ============================
 .admin-header {
-  --background: linear-gradient(135deg, #{$primary-color} 0%, #{$primary-dark} 100%);
-  box-shadow: 0 4px 12px rgba(21, 128, 61, 0.15);
+  --background: linear-gradient(135deg, #{$primary-color} 0%, #{$primary-light} 100%);
+  box-shadow: 0 4px 12px rgba(37, 99, 235, 0.15);
   position: sticky;
   top: 0;
   z-index: 99;
+  // Safe area padding for mobile devices (dynamic island)
+  padding-top: env(safe-area-inset-top);
 }
 
 .header-toolbar {
@@ -230,18 +232,20 @@ $border-color: #e5e7eb;       // Border Gray
 }
 
 // ============================
-// MAIN CONTENT STYLES
+// MAIN CONTENT STYLES - Matching Login Page Background
 // ============================
 .admin-dashboard-content {
-  --background: linear-gradient(180deg, #{$bg-light} 0%, #{$bg-white} 50%, #{$bg-light} 100%);
+  --background: linear-gradient(135deg, #eff6ff 0%, #dbeafe 50%, #bfdbfe 100%);
   padding: 0;
+  --padding-bottom: env(safe-area-inset-bottom);
 }
 
 // Header Card
 .header-card {
-  background: linear-gradient(135deg, #{$primary-color} 0%, #{$primary-dark} 100%);
+  background: linear-gradient(135deg, #{$primary-color} 0%, #{$primary-light} 100%);
   color: #{$text-light};
   padding: 32px 20px 20px;
+  padding-top: calc(32px + env(safe-area-inset-top));
   margin: 0;
 
   .greeting {
@@ -263,6 +267,85 @@ $border-color: #e5e7eb;       // Border Gray
 
 .dashboard-container {
   padding: 20px;
+  padding-bottom: calc(20px + env(safe-area-inset-bottom));
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+.chart-card {
+  --background: #{$bg-white};
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+  margin: 0;
+
+  ion-card-header {
+    padding: 16px 16px 8px;
+    border-bottom: 1px solid #{$border-color};
+    
+    ion-card-title {
+      font-size: 16px;
+      font-weight: 600;
+      color: #{$text-primary};
+    }
+  }
+
+  ion-card-content {
+    padding: 16px;
+  }
+}
+
+// ============================
+// CHARTS SECTION
+// ============================
+.charts-section {
+  margin-top: 20px;
+
+  .section-header {
+    margin-bottom: 16px;
+
+    h2 {
+      margin: 0;
+      font-size: 18px;
+      font-weight: 700;
+      color: #{$text-primary};
+      position: relative;
+      padding-left: 12px;
+
+      &::before {
+        content: '';
+        position: absolute;
+        left: 0;
+        top: 50%;
+        transform: translateY(-50%);
+        width: 4px;
+        height: 24px;
+        background: linear-gradient(135deg, #{$primary-color}, #{$accent-color});
+        border-radius: 2px;
+      }
+    }
+  }
+}
+
+.charts-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 16px;
+}
+
+.chart-container {
+  position: relative;
+  width: 100%;
+  max-width: 100%;
+  height: 220px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  canvas {
+    max-width: 100%;
+    max-height: 100%;
+  }
 }
 
 // ============================
@@ -318,7 +401,7 @@ $border-color: #e5e7eb;       // Border Gray
   &.classes {
     border-top-color: #{$primary-light};
     .stat-icon {
-      background: rgba(34, 197, 94, 0.1);
+      background: rgba(37, 99, 235, 0.1);
       color: #{$primary-light};
     }
   }
@@ -336,6 +419,14 @@ $border-color: #e5e7eb;       // Border Gray
     .stat-icon {
       background: rgba(139, 92, 246, 0.1);
       color: #{$secondary-color};
+    }
+  }
+
+  &.users {
+    border-top-color: #{$accent-color};
+    .stat-icon {
+      background: rgba(249, 115, 22, 0.1);
+      color: #{$accent-color};
     }
   }
 

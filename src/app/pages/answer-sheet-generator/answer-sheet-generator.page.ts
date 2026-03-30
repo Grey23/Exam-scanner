@@ -6,7 +6,7 @@ import { LocalDataService, TopicEntry } from '../../services/local-data.service'
 import { ActivatedRoute } from '@angular/router';
 import { Capacitor } from '@capacitor/core';
 import jsPDF from 'jspdf';
-import html2canvas from 'html2canvas';
+import { svg2pdf } from 'svg2pdf.js';
 import { FileOpener } from '@capacitor-community/file-opener';
 import { Share } from '@capacitor/share';
 import { Filesystem, Directory, Encoding } from '@capacitor/filesystem';
@@ -42,6 +42,14 @@ export class AnswerSheetGeneratorPage implements OnInit {
   // Small binary grid code (8x8) for student identity
   private readonly CODE_GRID_SIZE = 8;
   private readonly CODE_CELL_SIZE = 6; // template pixels
+
+  private studentCodeGridCacheKey = '';
+  private studentCodeGridCacheValue: number[][] | null = null;
+
+  private readonly EXPORT_CANVAS_TIMEOUT_MS = 15000;
+  private readonly EXPORT_PDF_TIMEOUT_MS = 45000;
+
+  isExporting = false;
 
   constructor(
     private route: ActivatedRoute,
@@ -218,6 +226,13 @@ export class AnswerSheetGeneratorPage implements OnInit {
    * We only need this for the currently rendered student/page.
    */
   get studentCodeGrid(): number[][] {
+    if (!this.currentStudentId) return [];
+
+    const cacheKey = `${Number(this.classId || 0)}-${Number(this.subjectId || 0)}-${Number(this.currentStudentId || 0)}`;
+    if (this.studentCodeGridCacheValue && this.studentCodeGridCacheKey === cacheKey) {
+      return this.studentCodeGridCacheValue;
+    }
+
     const size = this.CODE_GRID_SIZE;
     const grid: number[][] = Array.from({ length: size }, () => Array(size).fill(0));
 
@@ -254,6 +269,8 @@ export class AnswerSheetGeneratorPage implements OnInit {
       }
     }
 
+    this.studentCodeGridCacheKey = cacheKey;
+    this.studentCodeGridCacheValue = grid;
     return grid;
   }
 
@@ -264,6 +281,7 @@ export class AnswerSheetGeneratorPage implements OnInit {
     scale: number
   ): Promise<HTMLCanvasElement> {
     return new Promise((resolve, reject) => {
+      let timer: any;
       try {
         const xml = new XMLSerializer().serializeToString(svgEl);
         const svg = xml.includes('xmlns=') ? xml : xml.replace('<svg', '<svg xmlns="http://www.w3.org/2000/svg"');
@@ -271,6 +289,16 @@ export class AnswerSheetGeneratorPage implements OnInit {
         const url = URL.createObjectURL(blob);
 
         const img = new Image();
+        img.decoding = 'async';
+        img.crossOrigin = 'anonymous';
+
+        timer = setTimeout(() => {
+          try {
+            URL.revokeObjectURL(url);
+          } catch {}
+          reject(new Error('Timed out while rendering answer sheet (SVG -> Canvas).'));
+        }, this.EXPORT_CANVAS_TIMEOUT_MS);
+
         img.onload = () => {
           try {
             const canvas = document.createElement('canvas');
@@ -284,30 +312,29 @@ export class AnswerSheetGeneratorPage implements OnInit {
             ctx.setTransform(scale, 0, 0, scale, 0, 0);
             ctx.drawImage(img, 0, 0, width, height);
 
+            clearTimeout(timer);
             URL.revokeObjectURL(url);
             resolve(canvas);
           } catch (e) {
+            clearTimeout(timer);
             URL.revokeObjectURL(url);
             reject(e);
           }
         };
         img.onerror = (e) => {
+          clearTimeout(timer);
           URL.revokeObjectURL(url);
           reject(e);
         };
         img.src = url;
       } catch (e) {
+        clearTimeout(timer);
         reject(e);
       }
     });
   }
 
   private async buildPdfFromSvgForStudents(svgEl: SVGElement, studentsToExport: ClassStudent[]) {
-    const isWeb = Capacitor.getPlatform() === 'web';
-    const scale = isWeb ? 2 : 1.25;
-
-    const svgWidth = 800;
-    const svgHeight = 1131;
 
     const pdf = new jsPDF({
       orientation: 'portrait',
@@ -315,33 +342,86 @@ export class AnswerSheetGeneratorPage implements OnInit {
       format: 'a4',
     });
 
+    const pageWidth = pdf.internal.pageSize.getWidth();
+    const pageHeight = pdf.internal.pageSize.getHeight();
+
+    const waitFrames = async (frames: number) => {
+      for (let i = 0; i < frames; i++) {
+        await new Promise<void>((r) => requestAnimationFrame(() => r()));
+      }
+    };
+
+    const cloneSvgForExport = (src: SVGElement): SVGElement => {
+      const clone = src.cloneNode(true) as SVGElement;
+      // Ensure the clone has required namespace
+      if (!clone.getAttribute('xmlns')) {
+        clone.setAttribute('xmlns', 'http://www.w3.org/2000/svg');
+      }
+      return clone;
+    };
+
+    const setSvgText = (root: SVGElement, id: string, value: string) => {
+      const el = root.querySelector(`#${CSS.escape(id)}`);
+      if (!el) return;
+      el.textContent = value;
+    };
+
     for (let i = 0; i < studentsToExport.length; i++) {
+
       const st = studentsToExport[i];
       this.currentStudentName = String(st?.name || '');
       this.currentStudentRollNumber = String(st?.roll_number || '');
       this.currentStudentId = Number(st?.id || 0);
 
-      // Let Angular update the SVG bindings
-      await new Promise((r) => setTimeout(r, 30));
+      // Let Angular update the SVG bindings (text nodes inside SVG)
+      await waitFrames(2);
 
-      const canvas = await this.svgElementToCanvas(svgEl, svgWidth, svgHeight, scale);
-      const imgData = canvas.toDataURL('image/jpeg', 0.95);
-
-      const imgProps = pdf.getImageProperties(imgData);
-      const pageWidth = pdf.internal.pageSize.getWidth();
-      const pageHeight = pdf.internal.pageSize.getHeight();
-      const ratio = Math.min(pageWidth / imgProps.width, pageHeight / imgProps.height);
-      const renderWidth = imgProps.width * ratio;
-      const renderHeight = imgProps.height * ratio;
+      // Yield to UI thread before heavy PDF work
+      await new Promise((r) => setTimeout(r, 0));
 
       if (i > 0) pdf.addPage();
-      pdf.addImage(imgData, 'JPEG', 0, 0, renderWidth, renderHeight);
+
+      const svgForThisStudent = cloneSvgForExport(svgEl);
+
+      setSvgText(svgForThisStudent, 'student-name', this.currentStudentName || '');
+      setSvgText(svgForThisStudent, 'student-roll', this.currentStudentRollNumber || '');
+
+      try {
+        const vectorPromise = svg2pdf(svgForThisStudent, pdf, {
+          xOffset: 0,
+          yOffset: 0,
+          scale: 1,
+          width: pageWidth,
+          height: pageHeight,
+        } as any);
+
+        await Promise.race([
+          vectorPromise,
+          new Promise((_, rej) => setTimeout(() => rej(new Error('Timed out while generating PDF (SVG -> PDF).')), this.EXPORT_PDF_TIMEOUT_MS))
+        ]);
+      } catch (e) {
+        // Fallback to raster (some SVG features may not be supported)
+        const isWeb = Capacitor.getPlatform() === 'web';
+        const scale = isWeb ? 2 : 1.25;
+        const svgWidth = 800;
+        const svgHeight = 1131;
+        const canvas = await this.svgElementToCanvas(svgForThisStudent, svgWidth, svgHeight, scale);
+        const imgData = canvas.toDataURL('image/jpeg', 0.95);
+        const imgProps = pdf.getImageProperties(imgData);
+        const ratio = Math.min(pageWidth / imgProps.width, pageHeight / imgProps.height);
+        const renderWidth = imgProps.width * ratio;
+        const renderHeight = imgProps.height * ratio;
+
+        pdf.addImage(imgData, 'JPEG', 0, 0, renderWidth, renderHeight);
+      }
     }
 
     return pdf;
   }
 
   async exportPDF() {
+    if (this.isExporting) return;
+    this.isExporting = true;
 
     const element = document.getElementById('export-bubble-sheet') as SVGElement | null;
     if (!element) {
@@ -350,10 +430,14 @@ export class AnswerSheetGeneratorPage implements OnInit {
     }
 
     const roster = Array.isArray(this.students) ? this.students : [];
-    const studentsToExport: ClassStudent[] =
+    let studentsToExport: ClassStudent[] =
       this.selectedStudentId === 'all'
         ? roster
         : roster.filter(s => Number(s.id) === Number(this.selectedStudentId));
+
+    if (this.embedded && this.selectedStudentId === 'all') {
+      studentsToExport = roster.slice(0, 1);
+    }
 
     if (!studentsToExport.length) {
       await this.presentAlert('No enrolled students found for this subject. Please enroll students first in Class Students.');
@@ -375,7 +459,10 @@ export class AnswerSheetGeneratorPage implements OnInit {
     await loading.present();
 
     try {
-      const pdf = await this.buildPdfFromSvgForStudents(element, studentsToExport);
+      const pdf = await Promise.race<jsPDF>([
+        this.buildPdfFromSvgForStudents(element, studentsToExport),
+        new Promise((_, rej) => setTimeout(() => rej(new Error('Timed out while generating PDF.')), this.EXPORT_PDF_TIMEOUT_MS))
+      ]);
       const fileName = `answer-sheet-${this.className}-${this.subjectName}-${Date.now()}.pdf`;
 
       const isWeb = Capacitor.getPlatform() === 'web';
@@ -433,6 +520,7 @@ export class AnswerSheetGeneratorPage implements OnInit {
     } finally {
       this.applySelectedStudent();
       await loading.dismiss();
+      this.isExporting = false;
     }
   }
 

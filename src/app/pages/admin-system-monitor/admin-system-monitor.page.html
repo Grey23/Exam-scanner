@@ -1,0 +1,37 @@
+<app-admin-sidebar menuId="main" contentId="main-content" activePage="system"></app-admin-sidebar>
+
+<ion-header class="admin-header">
+  <ion-toolbar color="primary" class="header-toolbar">
+    <ion-buttons slot="start">
+      <ion-menu-button auto-hide="false" class="menu-button"></ion-menu-button>
+    </ion-buttons>
+    <div class="header-title-section">
+      <ion-title class="header-title">System Monitor</ion-title>
+    </div>
+  </ion-toolbar>
+</ion-header>
+
+<ion-content id="main-content" class="admin-page-content">
+  <div class="page-container">
+    <ion-card class="info-card">
+      <ion-card-header>
+        <ion-card-title>Backend API</ion-card-title>
+      </ion-card-header>
+      <ion-card-content>
+        <div class="kv">
+          <div class="k">Base URL</div>
+          <div class="v">{{ apiBaseUrl }}</div>
+        </div>
+      </ion-card-content>
+    </ion-card>
+
+    <ion-card class="info-card">
+      <ion-card-header>
+        <ion-card-title>Status</ion-card-title>
+      </ion-card-header>
+      <ion-card-content>
+        <div class="muted">This page is ready for additional system checks.</div>
+      </ion-card-content>
+    </ion-card>
+  </div>
+</ion-content>

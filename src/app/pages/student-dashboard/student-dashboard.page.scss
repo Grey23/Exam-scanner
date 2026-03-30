@@ -1,15 +1,16 @@
 .student-dashboard-content {
-  --background: linear-gradient(180deg, #f8f9fa 0%, #f0f2f5 100%);
+  --background: linear-gradient(135deg, #eff6ff 0%, #dbeafe 50%, #bfdbfe 100%);
   --padding-bottom: calc(96px + env(safe-area-inset-bottom));
 
   .header-card {
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    background: linear-gradient(135deg, #2563eb 0%, #3b82f6 100%);
     color: white;
     padding: 24px;
+    padding-top: calc(24px + env(safe-area-inset-top));
     display: flex;
     justify-content: space-between;
     align-items: center;
-    box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
+    box-shadow: 0 4px 12px rgba(37, 99, 235, 0.3);
 
     .greeting {
       flex: 1;
@@ -42,8 +43,8 @@
     ion-segment-button {
       --padding-top: 12px;
       --padding-bottom: 12px;
-      --color: #999;
-      --color-checked: #667eea;
+      --color: #64748b;
+      --color-checked: #2563eb;
       font-size: 12px;
 
       ion-icon {
@@ -97,7 +98,7 @@
         }
 
         &.primary {
-          background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+          background: linear-gradient(135deg, #2563eb 0%, #3b82f6 100%);
         }
 
         &.secondary {
@@ -159,13 +160,13 @@
             margin: 0 0 4px 0;
             font-size: 14px;
             font-weight: 600;
-            color: #333;
+            color: #0f172a;
           }
 
           p {
             margin: 0;
             font-size: 12px;
-            color: #999;
+            color: #64748b;
           }
         }
       }
@@ -256,7 +257,7 @@
           .large-score {
             font-size: 24px;
             font-weight: 700;
-            color: #667eea;
+            color: #2563eb;
 
             &.high {
               color: #28a745;
@@ -274,7 +275,7 @@
           .percentage {
             font-size: 18px;
             font-weight: 600;
-            color: #667eea;
+            color: #2563eb;
           }
         }
 
@@ -305,7 +306,7 @@
         }
 
         ion-button {
-          --color: #667eea;
+          --color: #2563eb;
           font-size: 12px;
           font-weight: 600;
         }
@@ -334,11 +335,11 @@
     }
 
     .advice-box {
-      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      background: linear-gradient(135deg, #2563eb 0%, #3b82f6 100%);
       color: white;
       border-radius: 12px;
       padding: 16px;
-      box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
+      box-shadow: 0 4px 12px rgba(37, 99, 235, 0.3);
 
       h3 {
         margin: 0 0 8px 0;
@@ -365,12 +366,12 @@
     min-height: 400px;
 
     ion-spinner {
-      color: #667eea;
+      color: #2563eb;
       margin-bottom: 16px;
     }
 
     p {
-      color: #999;
+      color: #64748b;
       font-size: 14px;
     }
   }

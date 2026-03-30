@@ -1,7 +1,9 @@
 export const environment = {
 
   production: true,
-  apiBaseUrl: ''
+  // Use Firebase Functions URL for Android/iOS app compatibility
+  // Firebase Hosting rewrites /api to the function, but native apps need the full URL
+  apiBaseUrl: 'https://us-central1-exam-scanner-b0867.cloudfunctions.net/api'
 
   ,firebaseConfig: {
     apiKey: 'AIzaSyCsj_mW0dWWk3poOTQCs9ieMhB_5fH2j8M',

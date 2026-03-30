@@ -8,11 +8,11 @@
 </ion-header>
 
 <ion-content class="ion-padding">
-  <ion-button expand="block" color="primary" (click)="exportPDF()">
+  <ion-button *ngIf="!embedded" expand="block" color="primary" (click)="exportPDF()">
     📄 Export & Share Answer Sheet
   </ion-button>
 
-  <ion-item lines="none">
+  <ion-item *ngIf="!embedded" lines="none">
     <ion-label position="stacked">Student</ion-label>
     <ion-select [(ngModel)]="selectedStudentId" (ionChange)="applySelectedStudent()" interface="popover">
       <ion-select-option value="all">All Students</ion-select-option>
@@ -64,14 +64,14 @@
         <line x1="110" y1="200" x2="300" y2="200" stroke="black" stroke-width="1" />
 
         <!-- Dynamic Data -->
-        <text x="120" y="135" font-size="18" font-weight="bold">{{ currentStudentName }}</text>
+        <text id="student-name" x="120" y="135" font-size="18" font-weight="bold">{{ currentStudentName }}</text>
         <text x="125" y="165" font-size="16">{{ className }}</text>
         
         <!-- Roll Number Section (Right Side of Header) -->
         <line x1="500" y1="100" x2="500" y2="210" stroke="black" stroke-width="1" />
         <text x="515" y="135" font-size="14" font-weight="bold">ROLL NUMBER:</text>
         <rect x="515" y="145" width="230" height="50" fill="#fcfcfc" stroke="black" stroke-width="2" rx="3" />
-        <text x="630" y="182" font-size="32" font-weight="bold" text-anchor="middle" letter-spacing="3">
+        <text id="student-roll" x="630" y="182" font-size="32" font-weight="bold" text-anchor="middle" letter-spacing="3">
           {{ currentStudentRollNumber }}
         </text>
       </g>

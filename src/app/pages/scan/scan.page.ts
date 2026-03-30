@@ -4,6 +4,8 @@ import { FormsModule } from '@angular/forms';
 import { IonicModule, AlertController } from '@ionic/angular';
 import { ActivatedRoute } from '@angular/router';
 import { HttpClientModule } from '@angular/common/http';
+import { httpsCallable } from 'firebase/functions';
+import { firebaseFunctions } from '../../firebase';
 
 import { CameraService } from '../../services/camera.service';
 import { TeacherService } from '../../services/teacher.service';
@@ -15,6 +17,7 @@ import { OpenCvScannerService } from '../../services/opencv-scanner.service';
 import { Camera, CameraResultType, CameraSource } from '@capacitor/camera';
 import jsQR from 'jsqr';
 import type { ClassStudent } from '../../services/teacher.service';
+import type { CornerHints } from '../../services/omr-scanner.service';
 
 interface GradingResult {
   questionNumber: number;
@@ -35,6 +38,7 @@ interface GradingResult {
 export class ScanPage implements AfterViewInit, OnDestroy {
   @ViewChild('video') videoRef!: ElementRef<HTMLVideoElement>;
   @ViewChild('canvas') canvasRef!: ElementRef<HTMLCanvasElement>;
+  @ViewChild('resultOverlay') resultOverlayRef!: ElementRef<HTMLCanvasElement>;
 
   // OMR Config
   readonly SHEET_WIDTH = 800;
@@ -58,6 +62,15 @@ export class ScanPage implements AfterViewInit, OnDestroy {
   gradingResults: GradingResult[] = [];
   lastCapturedImageData: string | null = null;
 
+  // When OpenCV runs, it returns a warped (800x1131) sheet image.
+  // If we render that as the preview, bubble-template coordinates align perfectly.
+  lastPreviewWasWarped = false;
+
+  // Template binding: used as the preview image src for manual review.
+  get scannedPreviewImage(): string | null {
+    return this.lastCapturedImageData;
+  }
+
   // Save to profile
   students: ClassStudent[] = [];
   rollNumberInput = '';
@@ -73,24 +86,182 @@ export class ScanPage implements AfterViewInit, OnDestroy {
   blankCount = 0;
   invalidCount = 0;
 
-  // Real-time tracking state
+  // Real-time marker tracking for visual feedback (no auto-capture)
   detectedMarkers: { [key: string]: { x: number, y: number } | null } = {
     tl: null, tr: null, br: null, bl: null
   };
-  autoCaptureCount = 0;
-  readonly AUTO_CAPTURE_THRESHOLD = 8; // Faster capture for shaky hands (approx 0.5s)
-
-  // Soft-lock memory (remembers a marker for a few frames if it flickers)
   markerMemory: { [key: string]: { pos: { x: number, y: number }, frames: number } } = {
     tl: { pos: { x: 0, y: 0 }, frames: 0 },
     tr: { pos: { x: 0, y: 0 }, frames: 0 },
     br: { pos: { x: 0, y: 0 }, frames: 0 },
     bl: { pos: { x: 0, y: 0 }, frames: 0 }
   };
-  readonly MEMORY_LIFE = 10; // Remember a lost marker for 10 frames
+  readonly MEMORY_LIFE = 10;
 
   private streamActive = false;
   private animationFrameId: number | null = null;
+
+  /**
+   * Called when the preview image loads (see template).
+   * Renders a lightweight overlay (corner marker dots) for manual review only.
+   */
+  renderScanOverlay() {
+    const overlay = this.resultOverlayRef?.nativeElement;
+    if (!overlay) return;
+
+    const ctx = overlay.getContext('2d');
+    if (!ctx) return;
+
+    const imgEl = document.querySelector('img.scan-preview-image') as HTMLImageElement | null;
+    const displayW = imgEl?.clientWidth || overlay.width || 0;
+    const displayH = imgEl?.clientHeight || overlay.height || 0;
+    if (displayW > 0) overlay.width = displayW;
+    if (displayH > 0) overlay.height = displayH;
+
+    if (!overlay.width || !overlay.height) return;
+
+    // Determine the coordinate base size for bubble-template.
+    // - Warped OpenCV preview is exactly 800x1131 -> perfect alignment.
+    // - Otherwise, fall back to the image's natural dimensions (may be cropped/offset).
+    const baseW = this.lastPreviewWasWarped ? this.SHEET_WIDTH : (imgEl?.naturalWidth || this.SHEET_WIDTH);
+    const baseH = this.lastPreviewWasWarped ? this.SHEET_HEIGHT : (imgEl?.naturalHeight || this.SHEET_HEIGHT);
+
+    const scaleX = overlay.width / Math.max(1, baseW);
+    const scaleY = overlay.height / Math.max(1, baseH);
+    const scaleR = Math.min(scaleX, scaleY);
+
+    ctx.clearRect(0, 0, overlay.width, overlay.height);
+
+    const byQuestion = new Map<number, GradingResult>();
+    for (const r of this.gradingResults || []) byQuestion.set(r.questionNumber, r);
+
+    const maxQuestionFromResults = (this.gradingResults || []).reduce((m, r) => Math.max(m, r.questionNumber), 0);
+    const maxQuestion = Math.max(
+      maxQuestionFromResults,
+      Math.min(50, Array.isArray(this.answerKey) ? this.answerKey.length : 0),
+      1
+    );
+
+    // Draw bubble template for each question (outline) and fill the detected/correct answers.
+    for (let q = 1; q <= Math.min(50, maxQuestion); q++) {
+      const tpl = bubbles[q - 1];
+      if (!tpl) continue;
+
+      const res = byQuestion.get(q);
+      const detected = res?.detectedAnswer;
+      const correct = res?.correctAnswer;
+
+      // Outline bubble
+      const drawBubble = (opt: 'A' | 'B' | 'C' | 'D', fill?: { color: string; alpha: number }) => {
+        const coord = tpl.options[opt];
+        const x = coord.cx * scaleX;
+        const y = coord.cy * scaleY;
+        const r = coord.radius * scaleR;
+
+        ctx.beginPath();
+        ctx.arc(x, y, r, 0, Math.PI * 2);
+        ctx.fillStyle = 'transparent';
+        ctx.strokeStyle = 'rgba(17,24,39,0.35)';
+        ctx.lineWidth = 2;
+
+        ctx.stroke();
+
+        if (fill) {
+          ctx.save();
+          ctx.globalAlpha = fill.alpha;
+          ctx.fillStyle = fill.color;
+          ctx.fill();
+          ctx.restore();
+        }
+      };
+
+      // Always show outlines for all options
+      drawBubble('A');
+      drawBubble('B');
+      drawBubble('C');
+      drawBubble('D');
+
+      if (!res) continue;
+
+      if (detected && ['A', 'B', 'C', 'D'].includes(detected)) {
+        const detectedColor =
+          res.status === 'Correct'
+            ? 'rgba(16,185,129,1)' // green
+            : res.status === 'Incorrect'
+              ? 'rgba(239,68,68,1)' // red
+              : res.status === 'Blank'
+                ? 'rgba(59,130,246,1)' // blue
+                : 'rgba(245,158,11,1)'; // amber/orange
+
+        drawBubble(detected as any, { color: detectedColor, alpha: 0.35 });
+      }
+
+      if (res.status === 'Incorrect' && correct && ['A', 'B', 'C', 'D'].includes(correct) && correct !== detected) {
+        drawBubble(correct as any, { color: 'rgba(59,130,246,1)', alpha: 0.25 });
+      }
+    }
+  }
+
+  private getTrackedCornerHints(): CornerHints | null {
+    const tl = this.detectedMarkers['tl'];
+    const tr = this.detectedMarkers['tr'];
+    const br = this.detectedMarkers['br'];
+    const bl = this.detectedMarkers['bl'];
+    if (!tl || !tr || !br || !bl) return null;
+    return { tl, tr, br, bl };
+  }
+
+  private buildWorkCanvasWithHints(
+    source: HTMLCanvasElement,
+    hints: CornerHints | null
+  ): { canvas: HTMLCanvasElement; hints: CornerHints | null } {
+    if (!hints) return { canvas: source, hints: null };
+    const xs = [hints.tl.x, hints.tr.x, hints.br.x, hints.bl.x];
+    const ys = [hints.tl.y, hints.tr.y, hints.br.y, hints.bl.y];
+
+    const pad = 80;
+    let minX = Math.max(0, Math.min(...xs) - pad);
+    let maxX = Math.min(source.width, Math.max(...xs) + pad);
+    let minY = Math.max(0, Math.min(...ys) - pad);
+    let maxY = Math.min(source.height, Math.max(...ys) + pad);
+
+    const minSize = 420;
+    if (maxX - minX < minSize) {
+      const grow = (minSize - (maxX - minX)) / 2;
+      minX = Math.max(0, minX - grow);
+      maxX = Math.min(source.width, maxX + grow);
+    }
+    if (maxY - minY < minSize) {
+      const grow = (minSize - (maxY - minY)) / 2;
+      minY = Math.max(0, minY - grow);
+      maxY = Math.min(source.height, maxY + grow);
+    }
+
+    const w = Math.max(1, Math.round(maxX - minX));
+    const h = Math.max(1, Math.round(maxY - minY));
+    if (w <= 1 || h <= 1) return { canvas: source, hints };
+
+    const work = document.createElement('canvas');
+    work.width = w;
+    work.height = h;
+    const wctx = work.getContext('2d');
+    if (!wctx) return { canvas: source, hints };
+
+    wctx.drawImage(source, minX, minY, w, h, 0, 0, w, h);
+
+    const adjustedHints: CornerHints = {
+      tl: { x: hints.tl.x - minX, y: hints.tl.y - minY },
+      tr: { x: hints.tr.x - minX, y: hints.tr.y - minY },
+      br: { x: hints.br.x - minX, y: hints.br.y - minY },
+      bl: { x: hints.bl.x - minX, y: hints.bl.y - minY }
+    };
+    return { canvas: work, hints: adjustedHints };
+  }
+
+  // Optional AI backup (Gemini via Firebase Functions)
+  // Keep OFF to preserve the original on-device scanning behavior.
+  aiAssistEnabled = false;
+  aiChecking = false;
 
   constructor(
     private cameraService: CameraService,
@@ -205,7 +376,7 @@ export class ScanPage implements AfterViewInit, OnDestroy {
         canvas.height = video.videoHeight;
         ctx.drawImage(video, 0, 0);
 
-        // REAL-TIME MARKER TRACKING
+        // Track markers for visual feedback (green corners) - no auto-capture
         if (!this.showResults && !this.isProcessing) {
           this.trackMarkers(ctx, canvas.width, canvas.height);
         }
@@ -227,11 +398,9 @@ export class ScanPage implements AfterViewInit, OnDestroy {
       const marker = this.omrLite.findNestedMarker(data, width, height, quad);
       
       if (marker) {
-        // We found it! Update memory
         this.markerMemory[quad.id] = { pos: marker.center, frames: this.MEMORY_LIFE };
         newMarkers[quad.id] = marker.center;
       } else {
-        // We lost it! Check memory
         if (this.markerMemory[quad.id].frames > 0) {
           this.markerMemory[quad.id].frames--;
           newMarkers[quad.id] = this.markerMemory[quad.id].pos;
@@ -242,25 +411,8 @@ export class ScanPage implements AfterViewInit, OnDestroy {
       }
     }
 
-    // Update UI state in Angular zone
     this.ngZone.run(() => {
       this.detectedMarkers = newMarkers;
-      
-      if (foundAll) {
-        this.autoCaptureCount++;
-        this.statusMessage = `HOLD STILL... ${Math.round((this.autoCaptureCount / this.AUTO_CAPTURE_THRESHOLD) * 100)}%`;
-        
-        // Auto-capture when stable
-        if (this.autoCaptureCount >= this.AUTO_CAPTURE_THRESHOLD) {
-          this.autoCaptureCount = 0;
-          // IMPORTANT: Before capturing, clear memory to ensure we use real data for grading
-          Object.keys(this.markerMemory).forEach(k => this.markerMemory[k].frames = 0);
-          void this.capture();
-        }
-      } else {
-        this.autoCaptureCount = 0;
-        this.statusMessage = 'BRING SHEET CLOSER';
-      }
     });
   }
 
@@ -282,7 +434,7 @@ export class ScanPage implements AfterViewInit, OnDestroy {
       const canvas = this.canvasRef.nativeElement;
       const ctx = canvas.getContext('2d', { willReadFrequently: true });
 
-      // 1) QR-first: try to decode any standard QR in the frame
+      // QR-first: try to decode any standard QR in the frame
       let qrStudentId: number | null = null;
       if (ctx) {
         const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
@@ -299,10 +451,20 @@ export class ScanPage implements AfterViewInit, OnDestroy {
         }
       }
 
-      // 2) Run OMR grading (ZipGrade-style: NativeScan/OpenCV on Android, enhanced OmrLite on web)
-      const { gradingResults, studentHash } = await this.omrScanner.processFrame(canvas, this.answerKey);
+      // If preview tracking sees all 4 corner markers (green boxes), crop/focus the scan input
+      // around the sheet to improve OpenCV marker detection and reduce warped results.
+      const tracked = this.getTrackedCornerHints();
+      const built = this.buildWorkCanvasWithHints(canvas, tracked);
+      const workCanvas = built.canvas;
 
-      this.lastCapturedImageData = canvas.toDataURL('image/jpeg', 0.85);
+      const { gradingResults, studentHash, warpedImageBase64 } = await this.omrScanner.processFrame(
+        workCanvas,
+        this.answerKey,
+        built.hints
+      );
+
+      this.lastPreviewWasWarped = !!warpedImageBase64;
+      this.lastCapturedImageData = warpedImageBase64 || workCanvas.toDataURL('image/jpeg', 0.85);
       this.saveSuccess = false;
 
       this.ngZone.run(() => {
@@ -319,6 +481,9 @@ export class ScanPage implements AfterViewInit, OnDestroy {
             this.autoAttachByHash(studentHash);
           }
         });
+        if (this.aiAssistEnabled) {
+          void this.runAiDoubleCheck();
+        }
       });
     } catch (e: any) {
       console.error('OMR Lite Error', e);
@@ -331,95 +496,6 @@ export class ScanPage implements AfterViewInit, OnDestroy {
         if (e.message.includes('markers')) {
           this.lastError = 'Sheet not visible. Please align corner markers.';
         }
-      });
-    }
-  }
-
-  async takePhoto() {
-    if (this.isProcessing) return;
-    this.isProcessing = true;
-    this.statusMessage = 'Launching camera...';
-    this.lastError = '';
-
-    try {
-      const image = await Camera.getPhoto({
-        quality: 100,
-        allowEditing: false,
-        resultType: CameraResultType.Uri,
-        source: CameraSource.Camera
-      });
-
-      if (image.webPath) {
-        this.statusMessage = 'Processing photo...';
-        
-        const img = new Image();
-        img.onload = async () => {
-          const canvas = document.createElement('canvas');
-          canvas.width = img.width;
-          canvas.height = img.height;
-          const ctx = canvas.getContext('2d');
-          if (ctx) {
-            ctx.drawImage(img, 0, 0);
-            try {
-              const ctx2 = canvas.getContext('2d', { willReadFrequently: true });
-
-              let qrStudentId: number | null = null;
-              if (ctx2) {
-                const imageData = ctx2.getImageData(0, 0, canvas.width, canvas.height);
-                const qr = jsQR(imageData.data, imageData.width, imageData.height);
-                if (qr?.data) {
-                  const parts = String(qr.data).split(':');
-                  if (parts.length >= 4 && parts[0] === 'QR') {
-                    const stuId = Number(parts[3] || 0);
-                    if (Number.isFinite(stuId)) {
-                      qrStudentId = stuId;
-                    }
-                  }
-                }
-              }
-
-              // For gallery imports, use the OmrLiteService directly. The source images are
-              // typically high-quality, perfectly aligned exports of the generated sheet,
-              // and the Lite pipeline is very robust for this case.
-              const { gradingResults, studentHash } = this.omrLite.processFrame(canvas, this.answerKey);
-              this.lastCapturedImageData = canvas.toDataURL('image/jpeg', 0.85);
-              this.saveSuccess = false;
-              this.ngZone.run(() => {
-                this.gradingResults = gradingResults;
-                this.calculateStats();
-                this.showResults = true;
-                this.isProcessing = false;
-                this.statusMessage = 'Ready to scan';
-                void this.loadStudentsForSave().then(() => {
-                  if (qrStudentId != null) {
-                    this.autoAttachByExactId(qrStudentId as number);
-                  } else if (studentHash != null) {
-                    this.autoAttachByHash(studentHash);
-                  }
-                });
-              });
-            } catch (err: any) {
-              this.ngZone.run(() => {
-                this.lastError = err?.message || 'Photo processing failed';
-                if (this.lastError.includes('markers')) {
-                  this.lastError = 'Corner markers not detected in photo.';
-                } else if (this.lastError.includes('timed out')) {
-                  this.lastError = 'Processing took too long. Please try again or retake the photo.';
-                }
-                this.isProcessing = false;
-                this.statusMessage = 'Ready to scan';
-              });
-            }
-          }
-        };
-        img.src = image.webPath;
-      }
-    } catch (e: any) {
-      console.error('Photo error', e);
-      this.ngZone.run(() => {
-        this.lastError = 'Photo capture cancelled or failed';
-        this.isProcessing = false;
-        this.statusMessage = 'Ready to scan';
       });
     }
   }
@@ -467,11 +543,11 @@ export class ScanPage implements AfterViewInit, OnDestroy {
                 }
               }
 
-              // For gallery imports, use the OmrLiteService directly. Imported sheets are
-              // high-quality exports of the generated template, and the Lite pipeline is
-              // tuned specifically for this case.
-              const { gradingResults, studentHash } = this.omrLite.processFrame(canvas, this.answerKey);
-              this.lastCapturedImageData = canvas.toDataURL('image/jpeg', 0.85);
+              // Use the same on-device scanner pipeline as live camera:
+              // NativeScan/OpenCV/OmrLite (no backend or Wi‑Fi required).
+              const { gradingResults, studentHash, warpedImageBase64 } = await this.omrScanner.processFrame(canvas, this.answerKey);
+              this.lastPreviewWasWarped = !!warpedImageBase64;
+              this.lastCapturedImageData = warpedImageBase64 || canvas.toDataURL('image/jpeg', 0.85);
               this.saveSuccess = false;
               this.ngZone.run(() => {
                 this.gradingResults = gradingResults;
@@ -486,6 +562,9 @@ export class ScanPage implements AfterViewInit, OnDestroy {
                     this.autoAttachByHash(studentHash);
                   }
                 });
+                if (this.aiAssistEnabled) {
+                  void this.runAiDoubleCheck();
+                }
               });
             } catch (err: any) {
               this.ngZone.run(() => {
@@ -708,5 +787,68 @@ export class ScanPage implements AfterViewInit, OnDestroy {
       this.isSaving = false;
     }
   }
+
+  /**
+   * Optional AI-assisted backup grading using Gemini via Firebase Functions.
+   * Calls a callable function `gradeOmrWithAI` if available, and lets AI
+   * suggest corrections for low-confidence / invalid questions.
+   */
+  private async runAiDoubleCheck() {
+    if (!this.gradingResults.length || this.aiChecking) return;
+
+    this.aiChecking = true;
+    try {
+      const fn = httpsCallable(
+        firebaseFunctions(),
+        'gradeOmrWithAI'
+      ) as any;
+
+      const payload = {
+        gradingResults: this.gradingResults,
+        answerKey: this.answerKey,
+        imageBase64: this.lastCapturedImageData || null,
+      };
+
+      const res = await fn(payload);
+      const aiResults: GradingResult[] = Array.isArray((res as any)?.data?.gradingResults)
+        ? (res as any).data.gradingResults
+        : [];
+
+      if (!aiResults.length) return;
+
+      // Merge AI suggestions: only override when AI is more confident
+      // or when our status is Invalid/Blank.
+      const byQuestion = new Map<number, GradingResult>();
+      aiResults.forEach(r => byQuestion.set(r.questionNumber, r));
+
+      this.gradingResults = this.gradingResults.map((orig) => {
+        const ai = byQuestion.get(orig.questionNumber);
+        if (!ai) return orig;
+
+        const origConf = orig.confidence ?? 0;
+        const aiConf = ai.confidence ?? 0;
+        const origIsWeak = orig.status === 'Invalid' || orig.status === 'Blank';
+
+        if (aiConf > origConf || origIsWeak) {
+          return {
+            ...orig,
+            detectedAnswer: ai.detectedAnswer,
+            status: ai.status,
+            confidence: aiConf,
+            rawScores: ai.rawScores ?? orig.rawScores,
+          };
+        }
+        return orig;
+      });
+
+      this.calculateStats();
+    } catch (e) {
+      // If AI backup fails (function missing, quota, etc.), just ignore.
+      console.warn('AI double-check failed or unavailable:', e);
+    } finally {
+      this.aiChecking = false;
+    }
+  }
+
 }
 

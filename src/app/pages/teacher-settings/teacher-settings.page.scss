@@ -1,6 +1,7 @@
 .settings-content {
-  --background: linear-gradient(135deg, #f5f7fa 0%, #eef2ff 100%);
+  --background: linear-gradient(135deg, #eff6ff 0%, #dbeafe 50%, #bfdbfe 100%);
   --ion-background-color: transparent;
+  --padding-bottom: env(safe-area-inset-bottom);
 }
 
 .settings-container {
@@ -16,7 +17,7 @@
   box-shadow: 0 12px 26px rgba(0, 0, 0, 0.08);
 
   ion-card-content {
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    background: linear-gradient(135deg, #2563eb 0%, #3b82f6 100%);
     color: #fff;
   }
  }
@@ -99,7 +100,7 @@
  }
 
  .form-item ion-icon {
-  color: #667eea;
+  color: #2563eb;
  }
 
  .form-item ion-label {
@@ -185,7 +186,7 @@
   justify-content: center;
   align-items: center;
   height: 100vh;
-  --color: #667eea;
+  --color: #2563eb;
 }
 
 @media (max-width: 576px) {

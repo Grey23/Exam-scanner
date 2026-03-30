@@ -339,6 +339,11 @@
       Set Answer Key
     </ion-button>
 
+    <ion-button expand="block" color="medium"
+      [routerLink]="['/answer-sheet-generator', classId, subjectId]">
+      Open Export Page
+    </ion-button>
+
     <ion-button expand="block" color="primary"
       [routerLink]="['/scan']"
       [queryParams]="{ classId: classId, subjectId: subjectId }">

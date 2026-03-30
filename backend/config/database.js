@@ -18,7 +18,7 @@ pool.getConnection()
   })
   .catch(err => {
     console.error('❌ MySQL Connection failed:', err);
-    process.exit(1);
+    // Do not crash the server; allow endpoints to run and report DB status as down.
   });
 
 module.exports = pool;
