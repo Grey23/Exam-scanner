@@ -25,6 +25,7 @@ export class AnswerSheetGeneratorPage implements OnInit {
   @Input() classId!: number;
   @Input() subjectId!: number;
   @Input() embedded: boolean = false;
+  @Input() totalQuestionsInput?: number;
 
   tos: TopicEntry[] = [];
   questions: any[] = [];
@@ -170,9 +171,14 @@ export class AnswerSheetGeneratorPage implements OnInit {
     this.selectedStudentId = 'all';
     this.applySelectedStudent();
 
-    const tosTotal = this.computeTotalQuestionsFromTos(this.tos);
-    const qTotal = Array.isArray(this.questions) ? this.questions.length : 0;
-    this.totalQuestions = qTotal > 0 ? qTotal : tosTotal;
+    // Use passed input if available (for embedded mode with live TOS updates)
+    if (this.totalQuestionsInput != null && this.totalQuestionsInput > 0) {
+      this.totalQuestions = this.totalQuestionsInput;
+    } else {
+      const tosTotal = this.computeTotalQuestionsFromTos(this.tos);
+      const qTotal = Array.isArray(this.questions) ? this.questions.length : 0;
+      this.totalQuestions = qTotal > 0 ? qTotal : tosTotal;
+    }
 
     if (this.totalQuestions > bubbles.length) {
       await this.presentAlert(
