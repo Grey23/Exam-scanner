@@ -1122,5 +1122,37 @@ export class TeacherService {
     }
   }
 
+  /**
+   * Count total generated questions across all subjects for the teacher.
+   * Used by the dashboard to display the "Questions Generated" stat.
+   */
+  async getTotalGeneratedQuestions(): Promise<number> {
+    try {
+      const teacherId = await this.getTeacherId();
+      const db = firebaseDb();
+
+      const classesSnap = await getDocs(collection(db, 'teachers', teacherId, 'classes'));
+      let total = 0;
+
+      for (const classDoc of classesSnap.docs) {
+        const classId = classDoc.id;
+        const subjectsSnap = await getDocs(
+          collection(db, 'teachers', teacherId, 'classes', classId, 'subjects')
+        );
+
+        for (const subjectDoc of subjectsSnap.docs) {
+          const data = subjectDoc.data();
+          const questions: any[] = Array.isArray(data?.['questions']) ? data['questions'] : [];
+          total += questions.length;
+        }
+      }
+
+      return total;
+    } catch (err) {
+      console.error('Error counting generated questions:', err);
+      return 0;
+    }
+  }
+
 }
 

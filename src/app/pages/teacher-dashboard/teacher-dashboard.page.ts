@@ -94,6 +94,7 @@ export class TeacherDashboardPage implements OnInit, AfterViewInit, OnDestroy {
       this.classes = await this.teacherService.getClasses();
       this.calculateDashboardData();
       await this.computeExamAnalytics();
+      await this.loadGeneratedQuestionsCount();
       this.showWelcomeCheck = true;
       setTimeout(() => {
         this.showWelcomeCheck = false;
@@ -103,6 +104,13 @@ export class TeacherDashboardPage implements OnInit, AfterViewInit, OnDestroy {
       await this.showToast('Failed to load dashboard data', 'danger');
     } finally {
       this.isLoading = false;
+    }
+  }
+
+  private async loadGeneratedQuestionsCount(): Promise<void> {
+    const totalQuestions = await this.teacherService.getTotalGeneratedQuestions();
+    if (this.dashboardData) {
+      this.dashboardData.totalQuestions = totalQuestions;
     }
   }
 
