@@ -11,7 +11,7 @@ import { AuthService, User } from '../../services/auth.service';
   styleUrls: ['./admin-sidebar.component.scss'],
 })
 export class AdminSidebarComponent {
-  @Input() activePage: 'dashboard' | 'system' | 'modules' | 'users' | '' = '';
+  @Input() activePage: 'dashboard' | 'system' | 'modules' | 'users' | 'schools' | '' = '';
   @Input() contentId: string = 'main-content';
   @Input() menuId: string = 'main';
 

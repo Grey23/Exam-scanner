@@ -35,11 +35,11 @@
             <span>I am a</span>
           </div>
           <div class="type-buttons">
-            <button type="button" class="type-btn" [class.active]="userType === 'teacher'" (click)="userType = 'teacher'">
+            <button type="button" class="type-btn" [class.active]="userType === 'teacher'" (click)="userType = 'teacher'; onUserTypeChange()">
               <ion-icon name="person-outline"></ion-icon>
               <span>Teacher</span>
             </button>
-            <button type="button" class="type-btn" [class.active]="userType === 'admin'" (click)="userType = 'admin'">
+            <button type="button" class="type-btn" [class.active]="userType === 'admin'" (click)="userType = 'admin'; onUserTypeChange()">
               <ion-icon name="school-outline"></ion-icon>
               <span>Admin</span>
             </button>
@@ -74,6 +74,48 @@
               name="schoolName"
               placeholder="Enter school name"
             ></ion-input>
+          </div>
+        </div>
+
+        <!-- Teacher ID Field (for teachers only) -->
+        <div class="input-group" *ngIf="userType === 'teacher'">
+          <div class="input-label">
+            <ion-icon name="id-card-outline"></ion-icon>
+            <span>Teacher ID</span>
+          </div>
+          <div class="input-wrapper">
+            <ion-input
+              type="text"
+              [(ngModel)]="teacherId"
+              name="teacherId"
+              placeholder="Enter your Teacher ID"
+              (ionBlur)="validateTeacherId()"
+              [disabled]="isLoading || validatingTeacherId"
+            ></ion-input>
+            <ion-button
+              fill="clear"
+              (click)="validateTeacherId()"
+              class="validate-btn"
+              type="button"
+              [disabled]="!teacherId.trim() || validatingTeacherId"
+            >
+              <ion-spinner *ngIf="validatingTeacherId" name="crescent"></ion-spinner>
+              <ion-icon *ngIf="!validatingTeacherId" name="checkmark-circle-outline"></ion-icon>
+            </ion-button>
+          </div>
+          <div class="validation-message" *ngIf="teacherIdMessage">
+            <ion-icon
+              [name]="teacherIdValid ? 'checkmark-circle' : 'close-circle'"
+              [class.valid]="teacherIdValid"
+              [class.invalid]="!teacherIdValid"
+            ></ion-icon>
+            <span [class.valid]="teacherIdValid" [class.invalid]="!teacherIdValid">
+              {{ teacherIdMessage }}
+            </span>
+          </div>
+          <div class="verified-name" *ngIf="verifiedTeacherName && teacherIdValid">
+            <ion-icon name="person-outline"></ion-icon>
+            <span>Verified: {{ verifiedTeacherName }}</span>
           </div>
         </div>
 

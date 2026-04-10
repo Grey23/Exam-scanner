@@ -89,6 +89,12 @@ apiApp.get("/health", (_req, res) => {
 });
 
 apiApp.use(async (req: Request, res: Response, next: NextFunction) => {
+  // Public endpoints (no auth required)
+  if (req.method === "GET" && req.path === "/admin/roster/check-teacher-id") {
+    next();
+    return;
+  }
+
   const decoded = await verifyFirebaseIdToken(req);
   if (!decoded) {
     res.status(401).json({ success: false, error: "Unauthorized" });
@@ -424,6 +430,487 @@ apiApp.post("/admin/users/set-password", async (req: Request, res: Response) => 
   } catch (err: any) {
     console.error("api/admin/users/set-password error:", err);
     return res.status(500).json({ success: false, error: "Failed to set password", message: err?.message });
+  }
+});
+
+// =====================================================
+// SCHOOLS MANAGEMENT
+// =====================================================
+
+// GET /admin/schools - list all schools
+apiApp.get("/admin/schools", async (req: Request, res: Response) => {
+  try {
+    const decoded = (req as any).user as admin.auth.DecodedIdToken;
+    if (!(await requireAdmin(decoded))) {
+      return res.status(403).json({ success: false, error: "Forbidden" });
+    }
+
+    const app = getFirebaseAdminApp();
+    const db = app.firestore();
+    const schoolsSnap = await db.collection("schools").orderBy("createdAt", "desc").get();
+
+    const schools = schoolsSnap.docs.map((doc) => {
+      const data = doc.data() || {};
+      return {
+        id: doc.id,
+        name: String((data as any).name || ""),
+        teacherCount: Number((data as any).teacherCount || 0),
+        registeredCount: Number((data as any).registeredCount || 0),
+        createdAt: (data as any).createdAt || null
+      };
+    });
+
+    return res.json({ success: true, data: { schools } });
+  } catch (err: any) {
+    console.error("api/admin/schools list error:", err);
+    return res.status(500).json({ success: false, error: "Failed to list schools", message: err?.message });
+  }
+});
+
+// POST /admin/schools - create a new school
+apiApp.post("/admin/schools", async (req: Request, res: Response) => {
+  try {
+    const decoded = (req as any).user as admin.auth.DecodedIdToken;
+    if (!(await requireAdmin(decoded))) {
+      return res.status(403).json({ success: false, error: "Forbidden" });
+    }
+
+    const schoolName = String(req.body?.name || "").trim();
+    if (!schoolName) {
+      return res.status(400).json({ success: false, error: "School name is required" });
+    }
+
+    const app = getFirebaseAdminApp();
+    const db = app.firestore();
+    const id = Date.now().toString();
+
+    await db.collection("schools").doc(id).set({
+      id,
+      name: schoolName,
+      teacherCount: 0,
+      registeredCount: 0,
+      createdAt: Date.now(),
+      createdBy: decoded.uid || "unknown"
+    });
+
+    return res.json({
+      success: true,
+      data: { id, name: schoolName, teacherCount: 0, registeredCount: 0 }
+    });
+  } catch (err: any) {
+    console.error("api/admin/schools create error:", err);
+    return res.status(500).json({ success: false, error: "Failed to create school", message: err?.message });
+  }
+});
+
+// PUT /admin/schools/:schoolId - update school name
+apiApp.put("/admin/schools/:schoolId", async (req: Request, res: Response) => {
+  try {
+    const decoded = (req as any).user as admin.auth.DecodedIdToken;
+    if (!(await requireAdmin(decoded))) {
+      return res.status(403).json({ success: false, error: "Forbidden" });
+    }
+
+    const schoolId = String(req.params.schoolId || "").trim();
+    const schoolName = String(req.body?.name || "").trim();
+
+    if (!schoolName) {
+      return res.status(400).json({ success: false, error: "School name is required" });
+    }
+
+    const app = getFirebaseAdminApp();
+    const db = app.firestore();
+    await db.collection("schools").doc(schoolId).set({
+      name: schoolName,
+      updatedAt: Date.now()
+    }, { merge: true });
+
+    return res.json({ success: true, data: { id: schoolId, name: schoolName } });
+  } catch (err: any) {
+    console.error("api/admin/schools update error:", err);
+    return res.status(500).json({ success: false, error: "Failed to update school", message: err?.message });
+  }
+});
+
+// DELETE /admin/schools/:schoolId - delete a school and its roster
+apiApp.delete("/admin/schools/:schoolId", async (req: Request, res: Response) => {
+  try {
+    const decoded = (req as any).user as admin.auth.DecodedIdToken;
+    if (!(await requireAdmin(decoded))) {
+      return res.status(403).json({ success: false, error: "Forbidden" });
+    }
+
+    const schoolId = String(req.params.schoolId || "").trim();
+    const app = getFirebaseAdminApp();
+    const db = app.firestore();
+
+    // Delete all teachers in the roster subcollection
+    const rosterSnap = await db.collection("schools").doc(schoolId).collection("roster").get();
+    const batch = db.batch();
+    rosterSnap.docs.forEach((doc) => batch.delete(doc.ref));
+    await batch.commit();
+
+    // Delete the school document
+    await db.collection("schools").doc(schoolId).delete();
+
+    return res.json({ success: true });
+  } catch (err: any) {
+    console.error("api/admin/schools delete error:", err);
+    return res.status(500).json({ success: false, error: "Failed to delete school", message: err?.message });
+  }
+});
+
+// =====================================================
+// TEACHER ROSTER MANAGEMENT
+// =====================================================
+
+// GET /admin/schools/:schoolId/roster - get teacher roster
+apiApp.get("/admin/schools/:schoolId/roster", async (req: Request, res: Response) => {
+  try {
+    const decoded = (req as any).user as admin.auth.DecodedIdToken;
+    if (!(await requireAdmin(decoded))) {
+      return res.status(403).json({ success: false, error: "Forbidden" });
+    }
+
+    const schoolId = String(req.params.schoolId || "").trim();
+    const app = getFirebaseAdminApp();
+    const db = app.firestore();
+
+    const rosterSnap = await db
+      .collection("schools")
+      .doc(schoolId)
+      .collection("roster")
+      .orderBy("name", "asc")
+      .get();
+
+    const teachers = rosterSnap.docs.map((doc) => {
+      const data = doc.data() || {};
+      return {
+        id: doc.id,
+        teacherId: String((data as any).teacherId || ""),
+        name: String((data as any).name || ""),
+        registered: Boolean((data as any).registered),
+        registeredAt: (data as any).registeredAt || null,
+        uid: (data as any).uid || null,
+        email: (data as any).email || null
+      };
+    });
+
+    return res.json({ success: true, data: { teachers } });
+  } catch (err: any) {
+    console.error("api/admin/roster get error:", err);
+    return res.status(500).json({ success: false, error: "Failed to get roster", message: err?.message });
+  }
+});
+
+// POST /admin/schools/:schoolId/roster/import - import teachers
+apiApp.post("/admin/schools/:schoolId/roster/import", async (req: Request, res: Response) => {
+  try {
+    const decoded = (req as any).user as admin.auth.DecodedIdToken;
+    if (!(await requireAdmin(decoded))) {
+      return res.status(403).json({ success: false, error: "Forbidden" });
+    }
+
+    const schoolId = String(req.params.schoolId || "").trim();
+    const teachers = req.body?.teachers;
+
+    if (!Array.isArray(teachers) || teachers.length === 0) {
+      return res.status(400).json({ success: false, error: "Teachers array is required" });
+    }
+
+    const app = getFirebaseAdminApp();
+    const db = app.firestore();
+    const batch = db.batch();
+    let imported = 0;
+    let skipped = 0;
+    const errors: { teacherId: string; reason: string }[] = [];
+
+    for (const teacher of teachers) {
+      const teacherId = String(teacher.teacherId || teacher.teacher_id || "").trim();
+      const name = String(teacher.name || teacher.teacherName || teacher.teacher_name || "").trim();
+
+      if (!teacherId || !name) {
+        skipped++;
+        continue;
+      }
+
+      // Enforce global uniqueness using a dedicated index document
+      const idxRef = db.collection("teacherIdIndex").doc(teacherId);
+      const idxSnap = await idxRef.get();
+      if (idxSnap.exists) {
+        const idxData: any = idxSnap.data() || {};
+        const existingSchoolId = String(idxData.schoolId || "").trim();
+        if (existingSchoolId && existingSchoolId !== String(schoolId)) {
+          skipped++;
+          errors.push({ teacherId, reason: "Teacher ID already exists in another school" });
+          continue;
+        }
+      }
+
+      const docRef = db.collection("schools").doc(schoolId).collection("roster").doc(teacherId);
+      batch.set(docRef, {
+        teacherId,
+        name,
+        registered: false,
+        registeredAt: null,
+        uid: null,
+        email: null,
+        importedAt: Date.now()
+      });
+
+      batch.set(
+        idxRef,
+        {
+          teacherId,
+          schoolId: String(schoolId),
+          name,
+          updatedAt: Date.now(),
+          createdAt: idxSnap.exists ? (idxSnap.data() as any)?.createdAt || Date.now() : Date.now()
+        },
+        { merge: true }
+      );
+      imported++;
+    }
+
+    await batch.commit();
+
+    // Update school teacher count
+    const rosterSnap = await db.collection("schools").doc(schoolId).collection("roster").get();
+    await db.collection("schools").doc(schoolId).set({
+      teacherCount: rosterSnap.size
+    }, { merge: true });
+
+    return res.json({
+      success: true,
+      data: { imported, skipped, errors: errors.slice(0, 10) }
+    });
+  } catch (err: any) {
+    console.error("api/admin/roster import error:", err);
+    return res.status(500).json({ success: false, error: "Failed to import roster", message: err?.message });
+  }
+});
+
+// DELETE /admin/schools/:schoolId/roster/:teacherId - remove teacher from roster
+apiApp.delete("/admin/schools/:schoolId/roster/:teacherId", async (req: Request, res: Response) => {
+  try {
+    const decoded = (req as any).user as admin.auth.DecodedIdToken;
+    if (!(await requireAdmin(decoded))) {
+      return res.status(403).json({ success: false, error: "Forbidden" });
+    }
+
+    const schoolId = String(req.params.schoolId || "").trim();
+    const teacherId = String(req.params.teacherId || "").trim();
+    const app = getFirebaseAdminApp();
+    const db = app.firestore();
+
+    await db.collection("schools").doc(schoolId).collection("roster").doc(teacherId).delete();
+
+    // Keep global index in sync
+    try {
+      await db.collection("teacherIdIndex").doc(teacherId).delete();
+    } catch (e) {
+      console.error("api/admin/roster delete: failed to delete teacherIdIndex doc", e);
+    }
+
+    // Update counts
+    const rosterSnap = await db.collection("schools").doc(schoolId).collection("roster").get();
+    const registeredSnap = await db
+      .collection("schools")
+      .doc(schoolId)
+      .collection("roster")
+      .where("registered", "==", true)
+      .get();
+
+    await db.collection("schools").doc(schoolId).set({
+      teacherCount: rosterSnap.size,
+      registeredCount: registeredSnap.size
+    }, { merge: true });
+
+    return res.json({ success: true });
+  } catch (err: any) {
+    console.error("api/admin/roster delete error:", err);
+    return res.status(500).json({ success: false, error: "Failed to delete teacher from roster", message: err?.message });
+  }
+});
+
+// GET /admin/roster/check-teacher-id - check if teacher ID is valid for registration
+apiApp.get("/admin/roster/check-teacher-id", async (req: Request, res: Response) => {
+  try {
+    const tid = String(req.query.teacherId || "").trim();
+    if (!tid) {
+      return res.status(400).json({ success: false, error: "teacherId is required" });
+    }
+
+    const app = getFirebaseAdminApp();
+    const db = app.firestore();
+
+    const idxSnap = await db.collection("teacherIdIndex").doc(tid).get();
+    if (!idxSnap.exists) {
+      return res.json({
+        success: true,
+        data: { exists: false, valid: false, reason: "Teacher ID not found in any school roster" }
+      });
+    }
+
+    const idxData: any = idxSnap.data() || {};
+    const schoolId = String(idxData.schoolId || "").trim() || null;
+    if (!schoolId) {
+      return res.json({
+        success: true,
+        data: { exists: false, valid: false, reason: "Teacher ID index is missing school information" }
+      });
+    }
+
+    const teacherDoc = await db.collection("schools").doc(schoolId).collection("roster").doc(tid).get();
+    if (!teacherDoc.exists) {
+      return res.json({
+        success: true,
+        data: { exists: false, valid: false, reason: "Teacher ID not found in school roster" }
+      });
+    }
+
+    const teacherData: any = teacherDoc.data() || {};
+
+    let schoolName = "";
+    if (schoolId) {
+      const schoolDoc = await db.collection("schools").doc(schoolId).get();
+      if (schoolDoc.exists) {
+        schoolName = String((schoolDoc.data() as any)?.name || "");
+      }
+    }
+
+    if (teacherData.registered) {
+      return res.json({
+        success: true,
+        data: {
+          exists: true,
+          valid: false,
+          reason: "Teacher ID is already registered",
+          name: teacherData.name,
+          schoolId,
+          schoolName,
+          registeredAt: teacherData.registeredAt
+        }
+      });
+    }
+
+    return res.json({
+      success: true,
+      data: {
+        exists: true,
+        valid: true,
+        reason: "Teacher ID is valid for registration",
+        name: teacherData.name,
+        schoolId,
+        schoolName
+      }
+    });
+  } catch (err: any) {
+    console.error("api/admin/roster/check-teacher-id error:", err);
+    return res.status(500).json({ success: false, error: "Failed to check teacher ID", message: err?.message });
+  }
+});
+
+// POST /admin/roster/mark-registered - mark teacher as registered
+apiApp.post("/admin/roster/mark-registered", async (req: Request, res: Response) => {
+  try {
+    const tid = String(req.body?.teacherId || "").trim();
+    const uid = String(req.body?.uid || "").trim();
+    const email = String(req.body?.email || "").trim();
+
+    if (!tid) {
+      return res.status(400).json({ success: false, error: "teacherId is required" });
+    }
+
+    const app = getFirebaseAdminApp();
+    const db = app.firestore();
+
+    const idxSnap = await db.collection("teacherIdIndex").doc(tid).get();
+    if (!idxSnap.exists) {
+      return res.status(404).json({ success: false, error: "Teacher not found in roster" });
+    }
+
+    const idxData: any = idxSnap.data() || {};
+    const schoolId = String(idxData.schoolId || "").trim();
+    if (!schoolId) {
+      return res.status(404).json({ success: false, error: "Teacher not found in roster" });
+    }
+
+    const teacherRef = db.collection("schools").doc(schoolId).collection("roster").doc(tid);
+    await teacherRef.set({
+      registered: true,
+      registeredAt: Date.now(),
+      uid: uid || null,
+      email: email || null
+    }, { merge: true });
+
+    if (schoolId) {
+      const registeredSnap = await db
+        .collection("schools")
+        .doc(schoolId)
+        .collection("roster")
+        .where("registered", "==", true)
+        .get();
+
+      await db.collection("schools").doc(schoolId).set({
+        registeredCount: registeredSnap.size
+      }, { merge: true });
+    }
+
+    return res.json({ success: true });
+  } catch (err: any) {
+    console.error("api/admin/roster/mark-registered error:", err);
+    return res.status(500).json({ success: false, error: "Failed to mark teacher as registered", message: err?.message });
+  }
+});
+
+// GET /admin/schools/:schoolId/export - export roster
+apiApp.get("/admin/schools/:schoolId/export", async (req: Request, res: Response) => {
+  try {
+    const decoded = (req as any).user as admin.auth.DecodedIdToken;
+    if (!(await requireAdmin(decoded))) {
+      return res.status(403).json({ success: false, error: "Forbidden" });
+    }
+
+    const schoolId = String(req.params.schoolId || "").trim();
+    const app = getFirebaseAdminApp();
+    const db = app.firestore();
+
+    const schoolDoc = await db.collection("schools").doc(schoolId).get();
+    if (!schoolDoc.exists) {
+      return res.status(404).json({ success: false, error: "School not found" });
+    }
+
+    const schoolData = schoolDoc.data();
+    const rosterSnap = await db
+      .collection("schools")
+      .doc(schoolId)
+      .collection("roster")
+      .orderBy("name", "asc")
+      .get();
+
+    const teachers = rosterSnap.docs.map((doc) => {
+      const data = doc.data() || {};
+      return {
+        teacherId: String((data as any).teacherId || ""),
+        name: String((data as any).name || ""),
+        registered: Boolean((data as any).registered) ? "Yes" : "No",
+        registeredAt: (data as any).registeredAt ? new Date((data as any).registeredAt).toISOString() : "",
+        email: (data as any).email || ""
+      };
+    });
+
+    return res.json({
+      success: true,
+      data: {
+        schoolName: (schoolData as any)?.name || "",
+        exportedAt: new Date().toISOString(),
+        teachers
+      }
+    });
+  } catch (err: any) {
+    console.error("api/admin/roster export error:", err);
+    return res.status(500).json({ success: false, error: "Failed to export roster", message: err?.message });
   }
 });
 

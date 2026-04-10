@@ -57,6 +57,16 @@ const routes: Routes = [
     canActivate: [AdminGuard]
   },
   {
+    path: 'admin-schools',
+    loadComponent: () => import('./pages/admin-schools/admin-schools.page').then(m => m.AdminSchoolsPage),
+    canActivate: [AdminGuard]
+  },
+  {
+    path: 'admin-roster/:schoolId',
+    loadComponent: () => import('./pages/admin-roster/admin-roster.page').then(m => m.AdminRosterPage),
+    canActivate: [AdminGuard]
+  },
+  {
     path: 'teacher-dashboard',
     loadChildren: () => import('./pages/teacher-dashboard/teacher-dashboard.module').then(m => m.TeacherDashboardPageModule),
     canActivate: [TeacherGuard]

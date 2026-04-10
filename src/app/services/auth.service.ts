@@ -31,6 +31,8 @@ export interface User {
 
   schoolId?: string | number;
 
+  teacherId?: string;
+
 }
 
 
@@ -138,11 +140,24 @@ export class AuthService {
 
     userType: 'teacher' | 'admin',
 
-    schoolName?: string
+    schoolName?: string,
+
+    teacherId?: string
 
   ): Promise<{ success: boolean; message: string }> {
 
     try {
+
+      // For teachers, validate Teacher ID against roster
+      if (userType === 'teacher' && teacherId) {
+        const checkResult = await this.checkTeacherId(teacherId);
+        if (!checkResult.success) {
+          return { success: false, message: checkResult.message || 'Failed to verify Teacher ID' };
+        }
+        if (!checkResult.data?.valid) {
+          return { success: false, message: checkResult.data?.reason || 'Invalid Teacher ID' };
+        }
+      }
 
       const auth = firebaseAuth();
 
@@ -162,7 +177,9 @@ export class AuthService {
 
         userType,
 
-        schoolName: schoolName || undefined
+        schoolName: schoolName || undefined,
+
+        teacherId: teacherId || undefined
 
       };
 
@@ -176,9 +193,16 @@ export class AuthService {
 
         schoolName: profile.schoolName || null,
 
+        teacherId: profile.teacherId || null,
+
         createdAt: serverTimestamp()
 
       }, { merge: true });
+
+      // Mark teacher as registered in roster
+      if (userType === 'teacher' && teacherId) {
+        await this.markTeacherRegistered(teacherId, creds.user.uid, email);
+      }
 
       await Preferences.set({ key: 'authToken', value: token });
 
@@ -244,6 +268,52 @@ export class AuthService {
 
     }
 
+  }
+
+  // Check if Teacher ID is valid for registration
+  async checkTeacherId(teacherId: string): Promise<{ success: boolean; data?: any; message?: string }> {
+    try {
+      const headers = await this.getAuthHeaders();
+      const res: any = await this.http.get(
+        `${environment.apiBaseUrl}/admin/roster/check-teacher-id`,
+        { headers, params: { teacherId } }
+      ).toPromise();
+
+      if (res?.success) {
+        return { success: true, data: res.data };
+      }
+
+      return { success: false, message: res?.error || res?.message || 'Failed to check Teacher ID' };
+    } catch (err: any) {
+      return { success: false, message: err?.error?.message || err?.message || 'Failed to check Teacher ID' };
+    }
+  }
+
+  // Mark teacher as registered in roster
+  private async markTeacherRegistered(teacherId: string, uid: string, email: string): Promise<void> {
+    try {
+      const headers = await this.getAuthHeaders();
+      await this.http.post(
+        `${environment.apiBaseUrl}/admin/roster/mark-registered`,
+        { teacherId, uid, email },
+        { headers }
+      ).toPromise();
+    } catch (err) {
+      console.error('Failed to mark teacher as registered:', err);
+      // Don't fail registration if this fails
+    }
+  }
+
+  private async getAuthHeaders(): Promise<HttpHeaders> {
+    const auth = firebaseAuth();
+    const current = auth.currentUser;
+    let token = this.getToken();
+
+    if (current && !token) {
+      token = await current.getIdToken();
+    }
+
+    return new HttpHeaders(token ? { Authorization: `Bearer ${token}` } : {});
   }
 
 

@@ -47,6 +47,12 @@
         <ion-icon name="chevron-forward-outline" slot="end" class="app-sidebar__chevron"></ion-icon>
       </ion-item>
 
+      <ion-item button class="app-sidebar__item" [class.app-sidebar__item--active]="activePage === 'schools'" (click)="goTo('/admin-schools')">
+        <ion-icon name="school-outline" slot="start"></ion-icon>
+        <ion-label>Schools</ion-label>
+        <ion-icon name="chevron-forward-outline" slot="end" class="app-sidebar__chevron"></ion-icon>
+      </ion-item>
+
       <div class="app-sidebar__divider"></div>
 
       <ion-item button class="app-sidebar__item app-sidebar__item--danger" (click)="logout()">

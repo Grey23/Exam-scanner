@@ -1,0 +1,394 @@
+<ion-header class="ion-no-border">
+  <ion-toolbar>
+    <ion-buttons slot="start">
+      <ion-back-button defaultHref="/admin-schools" text=""></ion-back-button>
+    </ion-buttons>
+    <ion-title>{{ schoolName || 'Teacher Roster' }}</ion-title>
+    <ion-buttons slot="end">
+      <ion-button (click)="exportRoster()" [disabled]="teachers.length === 0" class="icon-btn">
+        <ion-icon name="download-outline"></ion-icon>
+      </ion-button>
+    </ion-buttons>
+  </ion-toolbar>
+</ion-header>
+
+<ion-content>
+  <!-- Hero Section -->
+  <div class="hero-section" *ngIf="schoolName">
+    <div class="hero-content">
+      <div class="hero-icon">
+        <ion-icon name="school-outline"></ion-icon>
+      </div>
+      <div class="hero-text">
+        <h2>{{ schoolName }}</h2>
+        <p>Teacher Roster Management</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- Stats Cards -->
+  <div class="stats-section" *ngIf="teachers.length > 0">
+    <div class="stat-card">
+      <div class="stat-icon total">
+        <ion-icon name="people-outline"></ion-icon>
+      </div>
+      <div class="stat-info">
+        <span class="stat-number">{{ totalTeachers }}</span>
+        <span class="stat-label">Total</span>
+      </div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-icon registered">
+        <ion-icon name="checkmark-circle-outline"></ion-icon>
+      </div>
+      <div class="stat-info">
+        <span class="stat-number">{{ registeredCount }}</span>
+        <span class="stat-label">Registered</span>
+      </div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-icon pending">
+        <ion-icon name="time-outline"></ion-icon>
+      </div>
+      <div class="stat-info">
+        <span class="stat-number">{{ unregisteredCount }}</span>
+        <span class="stat-label">Pending</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Action Buttons -->
+  <div class="action-bar" *ngIf="teachers.length > 0">
+    <ion-searchbar
+      [(ngModel)]="searchQuery"
+      (ionInput)="filterTeachers()"
+      placeholder="Search teachers..."
+      class="search-bar"
+    ></ion-searchbar>
+    <div class="action-buttons">
+      <ion-button (click)="openAddModal()" class="add-btn">
+        <ion-icon name="add-outline"></ion-icon>
+        Add
+      </ion-button>
+      <ion-button (click)="openImportModal()" class="import-btn" fill="outline">
+        <ion-icon name="cloud-upload-outline"></ion-icon>
+        Import
+      </ion-button>
+    </div>
+  </div>
+
+  <!-- Loading State -->
+  <div *ngIf="isLoading && teachers.length === 0" class="loading-container">
+    <ion-spinner name="crescent"></ion-spinner>
+    <p>Loading roster...</p>
+  </div>
+
+  <!-- Empty State -->
+  <div *ngIf="!isLoading && teachers.length === 0" class="empty-state">
+    <div class="empty-illustration">
+      <ion-icon name="people-circle-outline" class="empty-icon"></ion-icon>
+      <div class="empty-dots">
+        <span></span><span></span><span></span>
+      </div>
+    </div>
+    <h3>No Teachers Yet</h3>
+    <p>Start by adding teachers manually or importing from Excel</p>
+    <div class="empty-actions">
+      <ion-button (click)="openAddModal()" class="primary-action">
+        <ion-icon name="person-add-outline" slot="start"></ion-icon>
+        Add Teacher
+      </ion-button>
+      <ion-button (click)="openImportModal()" fill="outline" class="secondary-action">
+        <ion-icon name="cloud-upload-outline" slot="start"></ion-icon>
+        Import Excel
+      </ion-button>
+    </div>
+  </div>
+
+  <!-- Teachers List -->
+  <div class="teachers-list" *ngIf="filteredTeachers.length > 0">
+    <ion-item-sliding *ngFor="let teacher of pagedTeachers" class="teacher-item">
+      <ion-item lines="none">
+        <div class="teacher-card">
+          <div class="teacher-avatar" [class.registered]="teacher.registered">
+            <span>{{ teacher.name?.charAt(0)?.toUpperCase() }}</span>
+          </div>
+          <div class="teacher-info">
+            <div class="teacher-name">
+              <h3>{{ teacher.name }}</h3>
+              <ion-badge [color]="teacher.registered ? 'success' : 'warning'" class="status-badge">
+                <ion-icon [name]="teacher.registered ? 'checkmark-circle' : 'time'" slot="start"></ion-icon>
+                {{ teacher.registered ? 'Registered' : 'Pending' }}
+              </ion-badge>
+            </div>
+            <div class="teacher-meta">
+              <span class="teacher-id">
+                <ion-icon name="id-card-outline"></ion-icon>
+                {{ teacher.teacherId }}
+              </span>
+              <span class="teacher-email" *ngIf="teacher.email">
+                <ion-icon name="mail-outline"></ion-icon>
+                {{ teacher.email }}
+              </span>
+            </div>
+            <span class="teacher-date" *ngIf="teacher.registered">
+              <ion-icon name="calendar-outline"></ion-icon>
+              {{ formatDate(teacher.registeredAt) }}
+            </span>
+          </div>
+        </div>
+      </ion-item>
+      <ion-item-options side="end">
+        <ion-item-option color="primary" (click)="openEditTeacherModal(teacher)" class="edit-option">
+          <ion-icon name="create-outline"></ion-icon>
+          <span>Edit</span>
+        </ion-item-option>
+        <ion-item-option color="danger" (click)="deleteTeacher(teacher)" class="delete-option">
+          <ion-icon name="trash-outline"></ion-icon>
+          <span>Delete</span>
+        </ion-item-option>
+      </ion-item-options>
+    </ion-item-sliding>
+
+    <div class="pagination" *ngIf="totalPages > 1">
+      <ion-button fill="clear" size="small" (click)="prevPage()" [disabled]="currentPage === 1">
+        <ion-icon name="chevron-back-outline" slot="start"></ion-icon>
+        Prev
+      </ion-button>
+
+      <div class="page-indicator">
+        Page {{ currentPage }} of {{ totalPages }}
+      </div>
+
+      <ion-button fill="clear" size="small" (click)="nextPage()" [disabled]="currentPage === totalPages">
+        Next
+        <ion-icon name="chevron-forward-outline" slot="end"></ion-icon>
+      </ion-button>
+    </div>
+  </div>
+
+  <!-- No Results -->
+  <div *ngIf="!isLoading && teachers.length > 0 && filteredTeachers.length === 0" class="no-results">
+    <ion-icon name="search-outline"></ion-icon>
+    <p>No teachers found matching "{{ searchQuery }}"</p>
+    <ion-button (click)="searchQuery = ''; filterTeachers()" fill="clear" size="small">
+      Clear search
+    </ion-button>
+  </div>
+
+  <!-- Import Modal -->
+  <ion-modal [isOpen]="showImportModal" (ionModalDidDismiss)="closeImportModal()">
+    <ng-template>
+      <ion-header class="ion-no-border">
+        <ion-toolbar>
+          <ion-title>Import Roster</ion-title>
+          <ion-buttons slot="end">
+            <ion-button (click)="closeImportModal()" class="close-btn">
+              <ion-icon name="close-outline"></ion-icon>
+            </ion-button>
+          </ion-buttons>
+        </ion-toolbar>
+      </ion-header>
+      <ion-content class="modal-content">
+        <div class="modal-hero import-hero">
+          <ion-icon name="document-text-outline"></ion-icon>
+          <h3>Import from Excel</h3>
+          <p>Upload your teacher roster file</p>
+        </div>
+
+        <div class="import-help">
+          <h4>Required columns</h4>
+          <p>
+            Use the template to avoid errors. The recommended format is:
+          </p>
+          <ul>
+            <li><strong>Teacher ID</strong></li>
+            <li><strong>Last Name</strong></li>
+            <li><strong>First Name</strong></li>
+            <li><strong>Mid Initial</strong> (optional)</li>
+          </ul>
+          <p class="import-help-note">
+            Backward compatible: you can also import using <strong>Name</strong> in the format
+            <strong>Last, First M.</strong>
+          </p>
+        </div>
+
+        <div class="template-section">
+          <ion-button expand="block" fill="outline" (click)="downloadTemplate()" class="template-btn">
+            <ion-icon name="download-outline" slot="start"></ion-icon>
+            Download Template
+          </ion-button>
+        </div>
+
+        <div class="file-upload-area" [class.has-file]="selectedFile">
+          <input
+            type="file"
+            accept=".xlsx,.xls"
+            (change)="onFileSelected($event)"
+            #fileInput
+            class="file-input"
+          />
+          <div class="upload-content" (click)="fileInput.click()">
+            <ion-icon name="cloud-upload-outline" class="upload-icon"></ion-icon>
+            <p class="upload-text">{{ selectedFile ? selectedFile.name : 'Tap to select Excel file' }}</p>
+            <span class="upload-hint" *ngIf="!selectedFile">.xlsx or .xls files</span>
+          </div>
+        </div>
+
+        <!-- Preview -->
+        <div *ngIf="importPreview.length > 0" class="import-preview">
+          <div class="preview-header">
+            <h4>Preview</h4>
+            <span class="preview-count">{{ importData.length }} teachers</span>
+          </div>
+          <div class="preview-list">
+            <div *ngFor="let t of importPreview" class="preview-item">
+              <div class="preview-avatar">{{ t.name?.charAt(0)?.toUpperCase() }}</div>
+              <div class="preview-info">
+                <span class="preview-name">{{ t.name }}</span>
+                <span class="preview-id">{{ t.teacherId }}</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <ion-button
+          expand="block"
+          (click)="importTeachers()"
+          [disabled]="isImporting || importData.length === 0"
+          class="submit-btn"
+        >
+          <ion-spinner *ngIf="isImporting" name="crescent"></ion-spinner>
+          <span *ngIf="!isImporting">Import {{ importData.length }} Teachers</span>
+        </ion-button>
+      </ion-content>
+    </ng-template>
+  </ion-modal>
+
+  <!-- Edit Teacher Modal -->
+  <ion-modal
+    class="dialog-modal"
+    [isOpen]="!!editingTeacher"
+    (ionModalDidDismiss)="closeEditTeacherModal()"
+  >
+    <ng-template>
+      <ion-header class="ion-no-border">
+        <ion-toolbar>
+          <ion-title>Edit Teacher</ion-title>
+          <ion-buttons slot="end">
+            <ion-button (click)="closeEditTeacherModal()" class="close-btn">
+              <ion-icon name="close-outline"></ion-icon>
+            </ion-button>
+          </ion-buttons>
+        </ion-toolbar>
+      </ion-header>
+      <ion-content class="modal-content">
+        <div class="modal-hero edit-hero">
+          <div class="edit-avatar">
+            <span>{{ editTeacherName?.charAt(0)?.toUpperCase() }}</span>
+          </div>
+          <p>Edit teacher details</p>
+        </div>
+
+        <div class="form-section">
+          <div class="form-group">
+            <label>Teacher ID</label>
+            <ion-input
+              [(ngModel)]="editTeacherId"
+              placeholder="Enter teacher ID"
+              [disabled]="isLoading"
+              class="form-input"
+            ></ion-input>
+          </div>
+          <div class="form-group">
+            <label>Teacher Name</label>
+            <ion-input
+              [(ngModel)]="editTeacherName"
+              placeholder="Enter teacher name"
+              [disabled]="isLoading"
+              class="form-input"
+            ></ion-input>
+          </div>
+          <div class="form-group">
+            <label>School</label>
+            <ion-select [(ngModel)]="editSchoolId" [disabled]="isLoading" interface="action-sheet" class="form-select">
+              <ion-select-option *ngFor="let school of schools" [value]="school.id">
+                {{ school.name }}
+              </ion-select-option>
+            </ion-select>
+          </div>
+        </div>
+
+        <ion-button
+          expand="block"
+          (click)="updateTeacher()"
+          [disabled]="isLoading || !editTeacherName.trim() || !editTeacherId.trim()"
+          class="submit-btn"
+        >
+          <ion-spinner *ngIf="isLoading" name="crescent"></ion-spinner>
+          <span *ngIf="!isLoading">Save Changes</span>
+        </ion-button>
+      </ion-content>
+    </ng-template>
+  </ion-modal>
+
+  <!-- Add Teacher Modal -->
+  <ion-modal
+    class="dialog-modal"
+    [isOpen]="showAddModal"
+    (ionModalDidDismiss)="closeAddModal()"
+  >
+    <ng-template>
+      <ion-header class="ion-no-border">
+        <ion-toolbar>
+          <ion-title>Add Teacher</ion-title>
+          <ion-buttons slot="end">
+            <ion-button (click)="closeAddModal()" class="close-btn">
+              <ion-icon name="close-outline"></ion-icon>
+            </ion-button>
+          </ion-buttons>
+        </ion-toolbar>
+      </ion-header>
+      <ion-content class="modal-content">
+        <div class="modal-hero add-hero">
+          <div class="add-avatar">
+            <ion-icon name="person-add-outline"></ion-icon>
+          </div>
+          <h3>New Teacher</h3>
+          <p>Add a teacher to the roster</p>
+        </div>
+
+        <div class="form-section">
+          <div class="form-group">
+            <label>Teacher ID</label>
+            <ion-input
+              [(ngModel)]="newTeacherId"
+              placeholder="e.g., T001"
+              [disabled]="isLoading"
+              class="form-input"
+            ></ion-input>
+          </div>
+          <div class="form-group">
+            <label>Full Name</label>
+            <ion-input
+              [(ngModel)]="newTeacherName"
+              placeholder="e.g., Juan Dela Cruz"
+              [disabled]="isLoading"
+              class="form-input"
+            ></ion-input>
+          </div>
+        </div>
+
+        <ion-button
+          expand="block"
+          (click)="addTeacher()"
+          [disabled]="isLoading || !newTeacherName.trim() || !newTeacherId.trim()"
+          class="submit-btn"
+        >
+          <ion-spinner *ngIf="isLoading" name="crescent"></ion-spinner>
+          <span *ngIf="!isLoading">Add Teacher</span>
+        </ion-button>
+      </ion-content>
+    </ng-template>
+  </ion-modal>
+</ion-content>

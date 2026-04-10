@@ -252,6 +252,81 @@
           font-size: 20px;
         }
       }
+
+      .validate-btn {
+        --padding-start: 8px;
+        --padding-end: 8px;
+        height: 36px;
+        min-width: 36px;
+
+        ion-icon {
+          color: #2563eb;
+          font-size: 20px;
+        }
+
+        ion-spinner {
+          --color: #2563eb;
+          width: 20px;
+          height: 20px;
+        }
+      }
+    }
+
+    .validation-message {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      margin-top: 8px;
+      padding: 8px 12px;
+      border-radius: 8px;
+      background: #f8fafc;
+
+      ion-icon {
+        font-size: 18px;
+
+        &.valid {
+          color: #16a34a;
+        }
+
+        &.invalid {
+          color: #dc2626;
+        }
+      }
+
+      span {
+        font-size: 13px;
+        font-weight: 500;
+
+        &.valid {
+          color: #16a34a;
+        }
+
+        &.invalid {
+          color: #dc2626;
+        }
+      }
+    }
+
+    .verified-name {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      margin-top: 8px;
+      padding: 8px 12px;
+      border-radius: 8px;
+      background: #ecfdf5;
+      border: 1px solid #86efac;
+
+      ion-icon {
+        font-size: 16px;
+        color: #16a34a;
+      }
+
+      span {
+        font-size: 13px;
+        color: #166534;
+        font-weight: 500;
+      }
     }
   }
 }

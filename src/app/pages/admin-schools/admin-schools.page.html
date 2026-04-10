@@ -1,0 +1,253 @@
+<ion-header class="ion-no-border">
+  <ion-toolbar>
+    <ion-buttons slot="start">
+      <ion-back-button defaultHref="/admin-dashboard" text=""></ion-back-button>
+    </ion-buttons>
+    <ion-title>Schools</ion-title>
+    <ion-buttons slot="end">
+      <ion-button (click)="openAddModal()" class="icon-btn">
+        <ion-icon name="add-outline"></ion-icon>
+      </ion-button>
+    </ion-buttons>
+  </ion-toolbar>
+</ion-header>
+
+<ion-content>
+  <!-- Hero Section -->
+  <div class="hero-section">
+    <div class="hero-content">
+      <div class="hero-icon">
+        <ion-icon name="school-outline"></ion-icon>
+      </div>
+      <div class="hero-text">
+        <h2>Schools Management</h2>
+        <p>Manage schools and teacher rosters</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- Stats Cards -->
+  <div class="stats-section" *ngIf="schools.length > 0">
+    <div class="stat-card">
+      <div class="stat-icon total">
+        <ion-icon name="business-outline"></ion-icon>
+      </div>
+      <div class="stat-info">
+        <span class="stat-number">{{ totalSchools }}</span>
+        <span class="stat-label">Schools</span>
+      </div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-icon teachers">
+        <ion-icon name="people-outline"></ion-icon>
+      </div>
+      <div class="stat-info">
+        <span class="stat-number">{{ totalTeachers }}</span>
+        <span class="stat-label">Teachers</span>
+      </div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-icon registered">
+        <ion-icon name="checkmark-circle-outline"></ion-icon>
+      </div>
+      <div class="stat-info">
+        <span class="stat-number">{{ totalRegistered }}</span>
+        <span class="stat-label">Registered</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Action Bar -->
+  <div class="action-bar" *ngIf="schools.length > 0">
+    <ion-searchbar
+      [(ngModel)]="searchQuery"
+      (ionInput)="filterSchools()"
+      placeholder="Search schools..."
+      class="search-bar"
+    ></ion-searchbar>
+    <div class="action-buttons">
+      <ion-button (click)="openAddModal()" class="add-btn">
+        <ion-icon name="add-outline"></ion-icon>
+        Add School
+      </ion-button>
+    </div>
+  </div>
+
+  <!-- Loading State -->
+  <div *ngIf="isLoading && schools.length === 0" class="loading-container">
+    <ion-spinner name="crescent"></ion-spinner>
+    <p>Loading schools...</p>
+  </div>
+
+  <!-- Empty State -->
+  <div *ngIf="!isLoading && schools.length === 0" class="empty-state">
+    <div class="empty-illustration">
+      <ion-icon name="school-outline" class="empty-icon"></ion-icon>
+      <div class="empty-dots">
+        <span></span><span></span><span></span>
+      </div>
+    </div>
+    <h3>No Schools Yet</h3>
+    <p>Add schools to manage teacher rosters</p>
+    <div class="empty-actions">
+      <ion-button (click)="openAddModal()" class="primary-action">
+        <ion-icon name="add-outline" slot="start"></ion-icon>
+        Add First School
+      </ion-button>
+    </div>
+  </div>
+
+  <!-- Schools List -->
+  <div class="schools-list" *ngIf="filteredSchools.length > 0">
+    <ion-item-sliding *ngFor="let school of filteredSchools" class="school-item">
+      <ion-item lines="none">
+        <div class="school-card" (click)="viewRoster(school)">
+          <div class="school-icon-wrapper">
+            <ion-icon name="school-outline" class="school-icon"></ion-icon>
+          </div>
+          <div class="school-info">
+            <div class="school-name">
+              <h3>{{ school.name }}</h3>
+              <ion-icon name="chevron-forward-outline" class="arrow-icon"></ion-icon>
+            </div>
+            <div class="school-stats">
+              <span class="stat-badge teachers">
+                <ion-icon name="people-outline"></ion-icon>
+                {{ school.teacherCount || 0 }}
+              </span>
+              <span class="stat-badge registered">
+                <ion-icon name="checkmark-circle-outline"></ion-icon>
+                {{ school.registeredCount || 0 }}
+              </span>
+            </div>
+            <span class="school-date">
+              <ion-icon name="calendar-outline"></ion-icon>
+              {{ formatDate(school.createdAt) }}
+            </span>
+          </div>
+        </div>
+      </ion-item>
+      <ion-item-options side="end">
+        <ion-item-option color="primary" (click)="openEditModal(school)" class="edit-option">
+          <ion-icon name="create-outline"></ion-icon>
+          <span>Edit</span>
+        </ion-item-option>
+        <ion-item-option color="danger" (click)="deleteSchool(school)" class="delete-option">
+          <ion-icon name="trash-outline"></ion-icon>
+          <span>Delete</span>
+        </ion-item-option>
+      </ion-item-options>
+    </ion-item-sliding>
+  </div>
+
+  <!-- No Results -->
+  <div *ngIf="!isLoading && schools.length > 0 && filteredSchools.length === 0" class="no-results">
+    <ion-icon name="search-outline"></ion-icon>
+    <p>No schools found matching "{{ searchQuery }}"</p>
+    <ion-button (click)="searchQuery = ''; filterSchools()" fill="clear" size="small">
+      Clear search
+    </ion-button>
+  </div>
+
+  <!-- Add School Modal -->
+  <ion-modal
+    class="dialog-modal"
+    [isOpen]="showAddModal"
+    (ionModalDidDismiss)="closeAddModal()"
+  >
+    <ng-template>
+      <ion-header class="ion-no-border">
+        <ion-toolbar>
+          <ion-title>Add School</ion-title>
+          <ion-buttons slot="end">
+            <ion-button (click)="closeAddModal()" class="close-btn">
+              <ion-icon name="close-outline"></ion-icon>
+            </ion-button>
+          </ion-buttons>
+        </ion-toolbar>
+      </ion-header>
+      <ion-content class="modal-content">
+        <div class="modal-hero add-hero">
+          <div class="add-avatar">
+            <ion-icon name="school-outline"></ion-icon>
+          </div>
+          <h3>New School</h3>
+          <p>Add a school to the system</p>
+        </div>
+
+        <div class="form-section">
+          <div class="form-group">
+            <label>School Name</label>
+            <ion-input
+              [(ngModel)]="newSchoolName"
+              placeholder="Enter school name"
+              [disabled]="isLoading"
+              class="form-input"
+            ></ion-input>
+          </div>
+        </div>
+
+        <ion-button
+          expand="block"
+          (click)="addSchool()"
+          [disabled]="isLoading || !newSchoolName.trim()"
+          class="submit-btn"
+        >
+          <ion-spinner *ngIf="isLoading" name="crescent"></ion-spinner>
+          <span *ngIf="!isLoading">Add School</span>
+        </ion-button>
+      </ion-content>
+    </ng-template>
+  </ion-modal>
+
+  <!-- Edit School Modal -->
+  <ion-modal
+    class="dialog-modal"
+    [isOpen]="!!editingSchool"
+    (ionModalDidDismiss)="closeEditModal()"
+  >
+    <ng-template>
+      <ion-header class="ion-no-border">
+        <ion-toolbar>
+          <ion-title>Edit School</ion-title>
+          <ion-buttons slot="end">
+            <ion-button (click)="closeEditModal()" class="close-btn">
+              <ion-icon name="close-outline"></ion-icon>
+            </ion-button>
+          </ion-buttons>
+        </ion-toolbar>
+      </ion-header>
+      <ion-content class="modal-content">
+        <div class="modal-hero edit-hero">
+          <div class="edit-avatar">
+            <ion-icon name="school-outline"></ion-icon>
+          </div>
+          <h3>{{ editSchoolName }}</h3>
+          <p>Update school details</p>
+        </div>
+
+        <div class="form-section">
+          <div class="form-group">
+            <label>School Name</label>
+            <ion-input
+              [(ngModel)]="editSchoolName"
+              placeholder="Enter school name"
+              [disabled]="isLoading"
+              class="form-input"
+            ></ion-input>
+          </div>
+        </div>
+
+        <ion-button
+          expand="block"
+          (click)="updateSchool()"
+          [disabled]="isLoading || !editSchoolName.trim()"
+          class="submit-btn"
+        >
+          <ion-spinner *ngIf="isLoading" name="crescent"></ion-spinner>
+          <span *ngIf="!isLoading">Save Changes</span>
+        </ion-button>
+      </ion-content>
+    </ng-template>
+  </ion-modal>
+</ion-content>
