@@ -55,7 +55,7 @@ export class ResultviewerPage implements OnInit, AfterViewInit {
 
   ngOnInit() {
     const stateResult = history.state?.resultData;
-
+    LocalDataService.getSubject(this.classId, this.subjectId)
     if (stateResult) {
       this.result = stateResult;
       this.classId = Number((stateResult as any).classId || 0);
@@ -107,18 +107,24 @@ export class ResultviewerPage implements OnInit, AfterViewInit {
     if (this.result?.tosRows) {
       this.tosRowView = this.buildTosRowView(this.result.tosRows);
     }
+
+    // 🔥 ADD THIS HERE (after everything is ready)
+    setTimeout(() => {
+      this.enrichAnswersWithTOS();
+      const subject = LocalDataService.getSubject(this.classId, this.subjectId);
+
+console.log("SUBJECT:", subject);
+
+      this.renderAnswerDistributionChart(this.result!.answers);
+      this.renderCognitiveChart(this.result!.answers);
+      this.renderTopicChart(this.result!.answers);
+      this.renderCompetencyChart(this.result!.answers);
+    }, 100);
   }
 
 
   ngAfterViewInit() {
-    setTimeout(() => {
-      if (this.result) {
-        this.renderAnswerDistributionChart(this.result.answers);
-        this.renderCognitiveChart(this.result.answers);
-        this.renderTopicChart(this.result.answers);
-        this.renderCompetencyChart(this.result.answers);
-      }
-    }, 500);
+   
   }
 
   /** Topics this student is strong at (highest % first). */
@@ -138,7 +144,35 @@ export class ResultviewerPage implements OnInit, AfterViewInit {
       .sort((a, b) => a.percent - b.percent)
       .slice(0, 3);
   }
+private enrichAnswersWithTOS() {
+  if (!this.result?.answers || !this.result?.tosRows) return;
 
+  let itemCounter = 1;
+
+  for (const row of this.result.tosRows as any[]) {
+    const levels = [
+      'remembering', 'understanding', 'applying',
+      'analyzing', 'evaluating', 'creating'
+    ];
+
+    for (const lvl of levels) {
+      const count = Number(row[lvl]) || 0;
+
+      for (let i = 0; i < count; i++) {
+        const questionNumber = itemCounter++;
+
+        const answer = this.result.answers.find(a => a.question === questionNumber);
+        if (answer) {
+          answer.level = lvl.charAt(0).toUpperCase() + lvl.slice(1);
+
+          // ✅ FIXED HERE
+          answer.topic = row.topicName || row.topic || 'N/A';
+          answer.competency = row.learningCompetency || row.competency || 'N/A';
+        }
+      }
+    }
+  }
+}
   // ✅ Build TOS Row Analysis
   private buildTosAnalysis() {
     if (!this.result) return;
@@ -149,6 +183,8 @@ export class ResultviewerPage implements OnInit, AfterViewInit {
       tosRows = LocalDataService.generateTOSRows(this.result.tosRows as any);
     }
     if (!tosRows?.length) return;
+    // ✅ ADD THIS LINE
+    this.result.tosRows = tosRows as any;
 
     this.tosAnalysis = tosRows.map((row: any) => {
       const start = row.startQuestion;

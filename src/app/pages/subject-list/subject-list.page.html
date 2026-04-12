@@ -1,11 +1,8 @@
-<app-sidebar menuId="main" contentId="main-content" activePage="subjects"></app-sidebar>
 
 <ion-header class="custom-header">
   <ion-toolbar color="primary" class="header-toolbar">
     <ion-buttons slot="start">
-      <ion-button fill="clear" class="menu-button" (click)="openSidebar()">
-        <ion-icon name="menu" slot="icon-only"></ion-icon>
-      </ion-button>
+      <ion-menu-button></ion-menu-button>
     </ion-buttons>
     <ion-title class="header-title">Subjects</ion-title>
     <ion-buttons slot="end">
@@ -14,7 +11,7 @@
   </ion-toolbar>
 </ion-header>
 
-<ion-content id="main-content" class="subject-list-content">
+<ion-content class="subject-list-content">
   <!-- Add Subject -->
   <ion-card class="add-subject-card">
     <ion-card-header>

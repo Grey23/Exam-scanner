@@ -12,8 +12,8 @@ import { AuthService, User } from '../../services/auth.service';
 })
 export class AdminSidebarComponent {
   @Input() activePage: 'dashboard' | 'system' | 'modules' | 'users' | 'schools' | '' = '';
-  @Input() contentId: string = 'main-content';
-  @Input() menuId: string = 'main';
+  @Input() contentId: string = 'admin-content';
+  @Input() menuId: string = 'admin-menu';
 
   currentUser: User | null = null;
 
@@ -26,6 +26,10 @@ export class AdminSidebarComponent {
     this.currentUser = this.authService.getCurrentUser();
   }
 
+  ionViewWillEnter() {
+    this.menuController.enable(true, 'admin-menu');
+    this.menuController.enable(false, 'main'); // disable teacher menu
+  }
   async ngOnInit() {
     try {
       await this.menuController.enable(true, this.menuId);

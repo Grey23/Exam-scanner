@@ -1,9 +1,12 @@
-<app-admin-sidebar menuId="main" contentId="main-content" activePage="dashboard"></app-admin-sidebar>
+<app-admin-sidebar 
+  menuId="admin-menu" 
+  contentId="admin-content" 
+  activePage="dashboard"></app-admin-sidebar>
 
 <ion-header class="admin-header">
   <ion-toolbar color="primary" class="header-toolbar">
     <ion-buttons slot="start">
-      <ion-menu-button auto-hide="false" class="menu-button"></ion-menu-button>
+      <ion-menu-button menu="admin-menu" auto-hide="false" class="menu-button"></ion-menu-button>
     </ion-buttons>
     <div class="header-title-section">
       <ion-title class="header-title">Admin Dashboard</ion-title>
@@ -16,7 +19,7 @@
   </ion-toolbar>
 </ion-header>
 
-<ion-content id="main-content" class="admin-dashboard-content">
+<ion-content id="admin-content" class="admin-dashboard-content">
   <div class="header-card">
     <div class="greeting">
       <h1>Welcome Back, {{ currentUser?.name }}!</h1>

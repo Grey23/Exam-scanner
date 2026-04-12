@@ -1,0 +1,239 @@
+.app-sidebar {
+  --width: 280px;
+  /* Let the menu render using the app theme background by default */
+  --background: transparent;
+}
+
+/*
+  Theme approach:
+  - Use Ionic CSS variables where possible.
+  - Provide safe fallbacks so the sidebar stays readable in both themes.
+*/
+
+.app-sidebar__header {
+  /* Opaque header so the page behind never shows through */
+  --background: var(--ion-background-color, #ffffff);
+  padding-top: 6px;
+  padding-bottom: 6px;
+  border-bottom: 1px solid rgba(107, 114, 128, 0.18);
+}
+
+.app-sidebar__brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  background: linear-gradient(135deg, #2563eb 0%, #3b82f6 100%);
+  box-shadow: 0 8px 18px rgba(37, 99, 235, 0.22);
+}
+
+.app-sidebar__brandText {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.1;
+}
+
+.app-sidebar__subtitle {
+  margin-top: 2px;
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: rgba(107, 114, 128, 0.9);
+}
+
+.app-sidebar__title {
+  font-weight: 900;
+  letter-spacing: -0.3px;
+}
+
+.app-sidebar__content {
+  --padding-top: 0;
+  --padding-bottom: 0;
+  --padding-start: 0;
+  --padding-end: 0;
+  background: var(--ion-background-color, #ffffff);
+  padding-top: calc(20px + env(safe-area-inset-top));
+}
+
+.app-sidebar__profile {
+  padding: 18px 16px 16px;
+  text-align: left;
+  margin: 12px 12px 10px;
+  border-radius: 16px;
+  background: linear-gradient(135deg, rgba(37, 99, 235, 0.16), rgba(59, 130, 246, 0.12));
+  border: 1px solid rgba(37, 99, 235, 0.16);
+  color: var(--ion-text-color, #111827);
+}
+
+.app-sidebar__avatar {
+  width: 44px;
+  height: 44px;
+  border-radius: 14px;
+  background: rgba(37, 99, 235, 0.18);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 18px;
+  font-weight: 900;
+  margin: 0 0 10px;
+  border: 1px solid rgba(37, 99, 235, 0.25);
+  color: var(--ion-text-color, #111827);
+}
+
+.app-sidebar__name {
+  font-size: 15px;
+  font-weight: 900;
+  line-height: 1.2;
+}
+
+.app-sidebar__email {
+  font-size: 13px;
+  opacity: 0.8;
+  margin-top: 2px;
+}
+
+.app-sidebar__list {
+  padding: 6px 10px 14px;
+}
+
+.app-sidebar__section {
+  margin: 14px 12px 8px;
+  font-size: 12px;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: rgba(107, 114, 128, 0.95);
+}
+
+.app-sidebar__divider {
+  height: 1px;
+  margin: 14px 12px;
+  background: rgba(107, 114, 128, 0.22);
+}
+
+.app-sidebar__item {
+  margin: 6px 8px;
+  border-radius: 14px;
+  --padding-start: 14px;
+  --padding-end: 14px;
+  --inner-padding-start: 0;
+  --inner-padding-end: 0;
+  --background: rgba(37, 99, 235, 0.06);
+  --ripple-color: rgba(37, 99, 235, 0.18);
+  --min-height: 46px;
+  border: 1px solid rgba(37, 99, 235, 0.14);
+  backdrop-filter: saturate(140%) blur(6px);
+  transition: transform 140ms ease, border-color 140ms ease, background-color 140ms ease;
+}
+
+.app-sidebar__item:hover {
+  transform: translateY(-1px);
+  --background: rgba(37, 99, 235, 0.10);
+  border-color: rgba(37, 99, 235, 0.20);
+}
+
+.app-sidebar__item ion-label {
+  font-weight: 800;
+  font-size: 15px;
+  letter-spacing: 0.2px;
+  color: var(--ion-text-color, #111827);
+}
+
+.app-sidebar__item ion-icon {
+  font-size: 20px;
+  color: rgba(75, 85, 99, 0.95);
+}
+
+.app-sidebar__item--active {
+  --background: rgba(37, 99, 235, 0.16);
+  border: 1px solid rgba(37, 99, 235, 0.35);
+  box-shadow: 0 8px 18px rgba(37, 99, 235, 0.14);
+}
+
+.app-sidebar__item--active ion-label {
+  color: var(--ion-text-color, #111827);
+}
+
+.app-sidebar__item--active ion-icon {
+  color: rgba(37, 99, 235, 0.98);
+}
+
+.app-sidebar__item--danger ion-icon {
+  color: #fb7185;
+}
+
+.app-sidebar__item--danger ion-label {
+  color: #fb7185;
+}
+
+.app-sidebar__chevron {
+  font-size: 16px;
+  opacity: 0.5;
+}
+
+.app-sidebar__item--active .app-sidebar__chevron {
+  opacity: 0.8;
+}
+
+/* Dark mode tuning */
+@media (prefers-color-scheme: dark) {
+  .app-sidebar__header {
+    --background: #0b1220;
+    border-bottom-color: rgba(255, 255, 255, 0.10);
+  }
+
+  .app-sidebar__content {
+    background: #0b1220;
+  }
+
+  .app-sidebar__profile {
+    background: linear-gradient(135deg, rgba(37, 99, 235, 0.22), rgba(59, 130, 246, 0.16));
+    border-color: rgba(37, 99, 235, 0.22);
+    color: rgba(255, 255, 255, 0.95);
+  }
+
+  .app-sidebar__avatar {
+    background: rgba(255, 255, 255, 0.10);
+    border-color: rgba(255, 255, 255, 0.14);
+    color: rgba(255, 255, 255, 0.95);
+  }
+
+  .app-sidebar__section {
+    color: rgba(203, 213, 225, 0.72);
+  }
+
+  .app-sidebar__subtitle {
+    color: rgba(203, 213, 225, 0.70);
+  }
+
+  .app-sidebar__divider {
+    background: rgba(255, 255, 255, 0.10);
+  }
+
+  .app-sidebar__item {
+    --background: rgba(255, 255, 255, 0.06);
+    border-color: rgba(255, 255, 255, 0.08);
+  }
+
+  .app-sidebar__item:hover {
+    --background: rgba(255, 255, 255, 0.10);
+    border-color: rgba(99, 102, 241, 0.20);
+  }
+
+  .app-sidebar__item ion-label {
+    color: rgba(255, 255, 255, 0.92);
+  }
+
+  .app-sidebar__item ion-icon {
+    color: rgba(255, 255, 255, 0.82);
+  }
+
+  .app-sidebar__item--active ion-label {
+    color: rgba(255, 255, 255, 0.98);
+  }
+
+  .app-sidebar__item--active ion-icon {
+    color: rgba(255, 255, 255, 0.98);
+  }
+}
