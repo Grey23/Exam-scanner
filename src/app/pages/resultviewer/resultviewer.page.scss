@@ -72,6 +72,30 @@
   color: var(--ion-color-success);
 }
 
+.score-card .mean-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid var(--ion-color-light-shade);
+}
+
+.score-card .mean-label {
+  font-size: 0.95rem;
+  color: var(--ion-color-medium);
+}
+
+.score-card .mean-value {
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--ion-color-primary);
+}
+
+.chart-card canvas {
+  width: 100% !important;
+}
+
 .analytics-card .topic-tags {
   display: flex;
   flex-wrap: wrap;
@@ -92,4 +116,97 @@
 .section-title {
   margin: 1rem 0 0.5rem;
   font-size: 1.1rem;
+}
+
+// Per-Topic Breakdown Card
+.topic-breakdown-card {
+  margin-bottom: 16px;
+
+  .topic-summary {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 12px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid var(--ion-color-light-shade);
+  }
+
+  .topic-score {
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: var(--ion-color-primary);
+  }
+
+  .topic-percent {
+    font-size: 1.25rem;
+    font-weight: 600;
+    color: var(--ion-color-success);
+    padding: 4px 12px;
+    background: rgba(var(--ion-color-success-rgb), 0.15);
+    border-radius: 12px;
+  }
+}
+
+// Cognitive Table
+.cognitive-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-bottom: 16px;
+
+  th, td {
+    padding: 8px 12px;
+    text-align: left;
+    border-bottom: 1px solid var(--ion-color-light-shade);
+  }
+
+  th {
+    font-weight: 600;
+    color: var(--ion-color-medium);
+    font-size: 0.85rem;
+    text-transform: uppercase;
+  }
+
+  td {
+    font-size: 0.95rem;
+
+    &.good {
+      color: var(--ion-color-success);
+      font-weight: 600;
+    }
+
+    &.poor {
+      color: var(--ion-color-danger);
+      font-weight: 600;
+    }
+  }
+
+  tbody tr:hover {
+    background: rgba(var(--ion-color-light-rgb), 0.3);
+  }
+}
+
+// Topic Chart Container
+.topic-chart-container {
+  height: 200px;
+  margin-top: 12px;
+
+  canvas {
+    width: 100% !important;
+    height: 100% !important;
+  }
+}
+
+// Warning Card
+.warning-card {
+  --background: rgba(var(--ion-color-warning-rgb), 0.1);
+  border: 1px solid var(--ion-color-warning);
+
+  ion-card-title {
+    color: var(--ion-color-warning-shade);
+  }
+
+  p {
+    margin: 8px 0;
+    color: var(--ion-color-medium-shade);
+  }
 }

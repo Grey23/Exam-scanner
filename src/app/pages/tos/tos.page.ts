@@ -384,6 +384,12 @@ export class TosPage implements OnInit {
     if (this.isSavingTos) return;
     this.isSavingTos = true;
     try {
+      // Ensure LocalDataService is loaded before saving
+      await LocalDataService.load();
+      console.log('=== TOS SAVE DEBUG ===');
+      console.log('classId:', this.classId, 'subjectId:', this.subjectId);
+      console.log('tos to save:', this.tos);
+
       const payload = (this.tos || []).map((row) => ({
         topicName: String(row.topicName || ''),
         learningCompetency: String(row.learningCompetency || ''),
@@ -412,6 +418,8 @@ export class TosPage implements OnInit {
 
       LocalDataService.saveTOS(this.classId, this.subjectId, payload);
       await LocalDataService.save();
+      LocalDataService.debugLog();
+      console.log('=== TOS SAVE COMPLETE ===');
       await this.presentAlert('TOS saved!');
     } catch (err: any) {
       await this.presentAlert(err?.message || 'Failed to save TOS');

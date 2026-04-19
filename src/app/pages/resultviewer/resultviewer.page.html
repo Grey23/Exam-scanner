@@ -9,21 +9,7 @@
 
 <ion-content class="ion-padding">
   <div *ngIf="result" id="print-area">
-    <!-- Scanned paper -->
-    <ion-card class="scan-card">
-      <ion-card-header>
-        <ion-card-title>Scanned Paper</ion-card-title>
-        <ion-card-subtitle *ngIf="result.studentName || result.rollNumber">
-          {{ result.studentName }}<span *ngIf="result.rollNumber"> • Roll: {{ result.rollNumber }}</span>
-        </ion-card-subtitle>
-      </ion-card-header>
-      <ion-card-content>
-        <img *ngIf="result.fullImage" [src]="result.fullImage" alt="Scanned answer sheet" class="scanned-image" />
-        <p *ngIf="!result.fullImage" class="no-image">Scanned image not available for this result.</p>
-      </ion-card-content>
-    </ion-card>
-
-    <!-- Score summary -->
+    <!-- Score summary + mean percentage -->
     <ion-card class="score-card">
       <ion-card-header>
         <ion-card-title>Score</ion-card-title>
@@ -39,6 +25,22 @@
         <div class="score-percent" *ngIf="result.total > 0">
           {{ (result.score / result.total * 100) | number:'1.0-0' }}%
         </div>
+
+        <div class="mean-row" *ngIf="meanPercentage > 0">
+          <span class="mean-label">Mean Percentage (Subject)</span>
+          <span class="mean-value">{{ meanPercentage | number:'1.0-0' }}%</span>
+        </div>
+      </ion-card-content>
+    </ion-card>
+
+    <!-- Combined cognitive chart -->
+    <ion-card class="chart-card">
+      <ion-card-header>
+        <ion-card-title>Cognitive Performance</ion-card-title>
+        <ion-card-subtitle>Combined (% correct per level)</ion-card-subtitle>
+      </ion-card-header>
+      <ion-card-content>
+        <canvas id="cognitiveCombinedChart"></canvas>
       </ion-card-content>
     </ion-card>
 
@@ -68,62 +70,116 @@
       </ion-card-content>
     </ion-card>
 
-    <!-- Detailed topic breakdown -->
-    <h3 class="section-title">Detailed topic breakdown</h3>
-    <ion-card *ngFor="let row of tosRowView; let i = index">
+    <!-- Cognitive analytics: strong/weak -->
+    <ion-card class="analytics-card" *ngIf="strongestCognitiveLevels.length">
       <ion-card-header>
-        <ion-card-title>Topic {{ i+1 }}: {{ row.topic }}</ion-card-title>
-        <ion-card-subtitle>{{ row.competency }} ({{ row.percent }}%)</ion-card-subtitle>
+        <ion-card-title>Cognitive levels you're strong at</ion-card-title>
       </ion-card-header>
       <ion-card-content>
-        <p><strong>Expected Items:</strong> {{ row.expectedItems }}</p>
-        <p>
-          <strong>Cognitive:</strong>
-          <span *ngFor="let cog of row.cognitives">
-            {{ cog.level | titlecase }} = {{ cog.count }}
+        <div class="topic-tags strong">
+          <span class="topic-tag" *ngFor="let c of strongestCognitiveLevels">
+            {{ c.level }} — {{ c.correct }}/{{ c.total }} ({{ c.percent }}%)
           </span>
-        </p>
-
-        <!-- ✅ Row Performance -->
-        <p>
-          <strong>Performance:</strong>
-          {{ row.rowCorrect }} / {{ row.rowTotal }}
-          ({{ row.performance }})
-        </p>
-
-        <!-- ✅ Item Breakdown -->
-        <div class="questions">
-          <h4>Items:</h4>
-          <ul>
-            <li *ngFor="let q of row.questions">
-              Q{{ q.qNum }} → Selected: {{ q.selected }} | Correct: {{ q.correct }}
-              <span [style.color]="q.isCorrect ? 'green' : 'red'">
-                ({{ q.isCorrect ? '✔' : '✘' }})
-              </span>
-            </li>
-          </ul>
+        </div>
+      </ion-card-content>
+    </ion-card>
+    <ion-card class="analytics-card weak" *ngIf="weakestCognitiveLevels.length">
+      <ion-card-header>
+        <ion-card-title>Cognitive levels to improve</ion-card-title>
+      </ion-card-header>
+      <ion-card-content>
+        <div class="topic-tags">
+          <span class="topic-tag weak" *ngFor="let c of weakestCognitiveLevels">
+            {{ c.level }} — {{ c.correct }}/{{ c.total }} ({{ c.percent }}%)
+          </span>
         </div>
       </ion-card-content>
     </ion-card>
 
-    <!-- ✅ Charts Section -->
-    <div>
-      <h3>Analysis</h3>
+    <!-- Charts Section -->
+    <ion-card class="chart-card">
+      <ion-card-header>
+        <ion-card-title>Graphs</ion-card-title>
+        <ion-card-subtitle>Per topic, competency, and cognitives</ion-card-subtitle>
+      </ion-card-header>
+      <ion-card-content>
+        <h4>Topic Breakdown</h4>
+        <canvas id="topicChart"></canvas>
 
-      <h4>Answer Distribution</h4>
-      <canvas id="answersChart"></canvas>
+        <h4>Competency Breakdown</h4>
+        <canvas id="competencyChart"></canvas>
 
-      <h4>Cognitive Breakdown</h4>
-      <canvas id="cognitiveChart"></canvas>
+        <h4>Cognitive Breakdown</h4>
+        <canvas id="cognitiveChart"></canvas>
+      </ion-card-content>
+    </ion-card>
 
-      <h4>Topic Breakdown</h4>
-      <canvas id="topicChart"></canvas>
+    <!-- Scanned paper (moved below analytics) -->
+    <ion-card class="scan-card">
+      <ion-card-header>
+        <ion-card-title>Scanned Paper</ion-card-title>
+        <ion-card-subtitle *ngIf="result.studentName || result.rollNumber">
+          {{ result.studentName }}<span *ngIf="result.rollNumber"> · Roll: {{ result.rollNumber }}</span>
+        </ion-card-subtitle>
+      </ion-card-header>
+      <ion-card-content>
+        <img *ngIf="result.fullImage" [src]="result.fullImage" alt="Scanned answer sheet" class="scanned-image" />
+        <p *ngIf="!result.fullImage" class="no-image">Scanned image not available for this result.</p>
+      </ion-card-content>
+    </ion-card>
 
-      <h4>Competency Breakdown</h4>
-      <canvas id="competencyChart"></canvas>
-    </div>
+    <!-- Per-Topic Cognitive Breakdown -->
+    <h3 class="section-title">Per-Topic Cognitive Breakdown</h3>
+    <ion-card class="topic-breakdown-card" *ngFor="let topicData of topicBreakdownData; let i = index">
+      <ion-card-header>
+        <ion-card-title>{{ topicData.topic }}</ion-card-title>
+        <ion-card-subtitle>{{ topicData.competency }}</ion-card-subtitle>
+      </ion-card-header>
+      <ion-card-content>
+        <div class="topic-summary">
+          <span class="topic-score">{{ topicData.totalCorrect }}/{{ topicData.totalItems }}</span>
+          <span class="topic-percent">{{ topicData.overallPercent }}%</span>
+        </div>
 
-    <ion-button expand="full" color="tertiary" (click)="printPage()">🖨️ Print Result</ion-button>
+        <!-- Cognitive table -->
+        <table class="cognitive-table">
+          <thead>
+            <tr>
+              <th>Cognitive Level</th>
+              <th>Score</th>
+              <th>Total</th>
+              <th>%</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr *ngFor="let cog of topicData.cognitives">
+              <td>{{ cog.level }}</td>
+              <td>{{ cog.correct }}</td>
+              <td>{{ cog.total }}</td>
+              <td [class.good]="cog.percent >= 70" [class.poor]="cog.percent < 50">{{ cog.percent }}%</td>
+            </tr>
+          </tbody>
+        </table>
+
+        <!-- Per-topic chart -->
+        <div class="topic-chart-container">
+          <canvas [id]="'topicChart-' + i"></canvas>
+        </div>
+      </ion-card-content>
+    </ion-card>
+
+    <!-- No TOS data warning -->
+    <ion-card class="warning-card" *ngIf="topicBreakdownData.length === 0 && (result?.answers?.length ?? 0) > 0">
+      <ion-card-header>
+        <ion-card-title>No TOS Data Available</ion-card-title>
+      </ion-card-header>
+      <ion-card-content>
+        <p>Topics, competencies, and cognitive levels will show as "N/A" because no TOS data was found for this subject.</p>
+        <p>Please set up the Table of Specification (TOS) with cognitive counts before scanning to see detailed analytics.</p>
+      </ion-card-content>
+    </ion-card>
+
+    <ion-button expand="full" color="tertiary" (click)="printPage()"> Print Result</ion-button>
   </div>
 
   <div *ngIf="!result">

@@ -1,7 +1,7 @@
-<ion-header>
-  <ion-toolbar color="primary">
+<ion-header class="settings-header">
+  <ion-toolbar class="header-toolbar">
     <ion-buttons slot="start">
-      <ion-back-button defaultHref="/teacher-dashboard"></ion-back-button>
+      <ion-menu-button></ion-menu-button>
     </ion-buttons>
     <ion-title>Settings</ion-title>
   </ion-toolbar>
@@ -11,22 +11,35 @@
   <ion-spinner *ngIf="isLoading" name="crescent" class="loading-spinner"></ion-spinner>
 
   <div *ngIf="!isLoading" class="settings-container">
-    <ion-card class="profile-card">
-      <ion-card-content>
-        <div class="profile-header">
-          <div class="avatar-large">{{ currentUser?.name?.charAt(0)?.toUpperCase() }}</div>
-          <div class="profile-text">
-            <div class="profile-name">{{ currentUser?.name }}</div>
-            <div class="profile-email">{{ currentUser?.email }}</div>
-          </div>
+    <!-- Profile Header Card -->
+    <div class="profile-header-card">
+      <div class="profile-image-wrapper">
+        <div class="profile-image" (click)="selectProfileImage()" [style.backgroundImage]="profileImageUrl ? 'url(' + profileImageUrl + ')' : null">
+          <span *ngIf="!profileImageUrl">{{ currentUser?.name?.charAt(0)?.toUpperCase() }}</span>
         </div>
-      </ion-card-content>
-    </ion-card>
+        <div class="camera-overlay" (click)="selectProfileImage()">
+          <ion-icon name="camera-outline"></ion-icon>
+        </div>
+        <div class="remove-photo-btn" *ngIf="profileImageUrl" (click)="removePhoto()">
+          <ion-icon name="close-outline"></ion-icon>
+        </div>
+        <input type="file" #fileInput style="display: none" accept="image/*" (change)="onImageSelected($event)">
+      </div>
+      <h2 class="profile-name">{{ currentUser?.name }}</h2>
+      <p class="profile-email">{{ currentUser?.email }}</p>
+      <div class="school-badge" *ngIf="schoolName">
+        <ion-icon name="school-outline"></ion-icon>
+        <span>{{ schoolName }}</span>
+      </div>
+    </div>
 
     <!-- Edit Profile Form -->
     <ion-card class="settings-card">
       <ion-card-header>
-        <ion-card-title>Profile Information</ion-card-title>
+        <ion-card-title>
+          <ion-icon name="person-circle-outline"></ion-icon>
+          Profile Information
+        </ion-card-title>
       </ion-card-header>
 
       <ion-card-content>
@@ -56,18 +69,6 @@
             ></ion-input>
           </ion-item>
 
-          <!-- School ID -->
-          <ion-item class="form-item" lines="none">
-            <ion-icon slot="start" name="school-outline"></ion-icon>
-            <ion-label position="stacked">School ID</ion-label>
-            <ion-input
-              [(ngModel)]="formData.schoolId"
-              name="schoolId"
-              type="text"
-              placeholder="Your school ID"
-            ></ion-input>
-          </ion-item>
-
           <!-- Bio -->
           <ion-item class="form-item span-2" lines="none">
             <ion-icon slot="start" name="document-text-outline"></ion-icon>
@@ -86,41 +87,48 @@
         <div class="button-group">
           <ion-button
             expand="block"
-            color="primary"
             (click)="saveProfile()"
             [disabled]="isSaving"
-            class="primary-btn"
+            class="save-btn"
           >
-            <ion-icon name="checkmark" slot="start"></ion-icon>
+            <ion-icon name="checkmark-circle-outline" slot="start"></ion-icon>
             {{ isSaving ? 'Saving...' : 'Save Changes' }}
-          </ion-button>
-          <ion-button
-            expand="block"
-            color="medium"
-            (click)="goBack()"
-            [disabled]="isSaving"
-            class="secondary-btn"
-          >
-            <ion-icon name="close" slot="start"></ion-icon>
-            Cancel
           </ion-button>
         </div>
       </ion-card-content>
     </ion-card>
 
-    <!-- Info Card -->
-    <ion-card class="info-card">
+    <!-- School Information Card -->
+    <ion-card class="school-card" *ngIf="schoolInfo">
       <ion-card-header>
-        <ion-card-title>Account Info</ion-card-title>
+        <ion-card-title>
+          <ion-icon name="business-outline"></ion-icon>
+          School Information
+        </ion-card-title>
       </ion-card-header>
       <ion-card-content>
-        <div class="info-row">
-          <span class="label">Account Type:</span>
-          <span class="value">Teacher</span>
-        </div>
-        <div class="info-row">
-          <span class="label">User ID:</span>
-          <span class="value">{{ currentUser?.id }}</span>
+        <div class="school-info-grid">
+          <div class="info-item">
+            <ion-icon name="school-outline"></ion-icon>
+            <div class="info-content">
+              <span class="info-label">School Name</span>
+              <span class="info-value">{{ schoolInfo?.name || 'Not specified' }}</span>
+            </div>
+          </div>
+          <div class="info-item" *ngIf="schoolInfo?.address">
+            <ion-icon name="location-outline"></ion-icon>
+            <div class="info-content">
+              <span class="info-label">Address</span>
+              <span class="info-value">{{ schoolInfo?.address }}</span>
+            </div>
+          </div>
+          <div class="info-item" *ngIf="schoolInfo?.phone">
+            <ion-icon name="call-outline"></ion-icon>
+            <div class="info-content">
+              <span class="info-label">Phone</span>
+              <span class="info-value">{{ schoolInfo?.phone }}</span>
+            </div>
+          </div>
         </div>
       </ion-card-content>
     </ion-card>

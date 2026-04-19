@@ -80,15 +80,39 @@ export class LocalDataService {
   // Load from storage into memory
   static async load(): Promise<void> {
     if (this.isLoaded) {
+      console.log('LocalDataService already loaded, skipping');
       return;
     }
+    console.log('LocalDataService loading from storage...');
     const stored = await Preferences.get({ key: 'examData' });
     if (stored.value) {
       this.classes = JSON.parse(stored.value);
+      console.log('Loaded classes:', this.classes.length);
     } else {
       this.classes = [];
+      console.log('No stored data found, initialized empty classes');
     }
     this.isLoaded = true;
+  }
+
+  // Force reload from storage (useful for debugging)
+  static async forceReload(): Promise<void> {
+    this.isLoaded = false;
+    await this.load();
+  }
+
+  // Debug: log current state
+  static debugLog(): void {
+    console.log('=== LocalDataService DEBUG ===');
+    console.log('isLoaded:', this.isLoaded);
+    console.log('classes count:', this.classes.length);
+    this.classes.forEach((cls, i) => {
+      console.log(`Class ${i}:`, cls.id, cls.name, 'subjects:', cls.subjects.length);
+      cls.subjects.forEach((sub, j) => {
+        console.log(`  Subject ${j}:`, sub.id, sub.name, 'tos:', sub.tos?.length, 'tosRows:', sub.tosRows?.length);
+      });
+    });
+    console.log('==============================');
   }
 
   static async save(): Promise<void> {
@@ -144,11 +168,41 @@ export class LocalDataService {
   }
 
   static saveTOS(classId: number, subjectId: number, tos: TopicEntry[]) {
-    const subject = this.getSubject(classId, subjectId);
-    if (subject) {
-      subject.tos = tos;
-      subject.tosRows = this.generateTOSRows(tos);  // ✅ auto-generate tosRows
+    console.log('saveTOS called with classId:', classId, 'subjectId:', subjectId, 'tos length:', tos?.length);
+
+    let subject = this.getSubject(classId, subjectId);
+
+    if (!subject) {
+      // Subject doesn't exist - try to create it
+      console.log('Subject not found, attempting to create...');
+
+      let cls = this.getClass(classId);
+      if (!cls) {
+        // Class doesn't exist either - create it
+        console.log('Class not found, creating class:', classId);
+        cls = {
+          id: classId,
+          name: `Class ${classId}`,
+          subjects: []
+        };
+        this.classes.push(cls);
+      }
+
+      // Create subject
+      subject = {
+        id: subjectId,
+        name: `Subject ${subjectId}`,
+        tos: [],
+        questions: [],
+        answerKey: []
+      };
+      cls.subjects.push(subject);
+      console.log('Created subject:', subjectId);
     }
+
+    subject.tos = tos;
+    subject.tosRows = this.generateTOSRows(tos);
+    console.log('TOS saved. tosRows length:', subject.tosRows?.length);
   }
 
   static generateTOSMap(tos: TopicEntry[]): {

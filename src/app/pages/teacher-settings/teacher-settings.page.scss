@@ -1,204 +1,413 @@
+// ============================
+// DESIGN SYSTEM - Matching System Style
+// ============================
+$primary-color: #2563eb;
+$primary-light: #3b82f6;
+$accent-color: #f97316;
+$danger-color: #ef4444;
+$success-color: #10b981;
+$text-primary: #0f172a;
+$text-secondary: #64748b;
+$bg-light: #eff6ff;
+$bg-white: #ffffff;
+$border-color: #e5e7eb;
+
+.settings-header {
+  --background: linear-gradient(135deg, #{$primary-color} 0%, #{$primary-light} 100%);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+  position: sticky;
+  top: 0;
+  z-index: 99;
+  padding-top: env(safe-area-inset-top);
+}
+
+.header-toolbar {
+  --background: transparent;
+  --color: white;
+  --border-color: transparent;
+  padding: 8px 0;
+}
+
+.header-toolbar ion-title {
+  font-weight: 700;
+  font-size: 18px;
+}
+
 .settings-content {
-  --background: linear-gradient(135deg, #eff6ff 0%, #dbeafe 50%, #bfdbfe 100%);
+  --background: linear-gradient(135deg, #{$bg-light} 0%, #dbeafe 50%, #bfdbfe 100%);
   --ion-background-color: transparent;
   --padding-bottom: env(safe-area-inset-bottom);
 }
 
 .settings-container {
-  padding: 16px;
-  max-width: 720px;
+  padding: 20px;
+  max-width: 600px;
   margin: 0 auto;
 }
 
- .profile-card {
-  margin: 0 0 14px 0;
-  border-radius: 16px;
+/* Profile Header Card */
+.profile-header-card {
+  background: linear-gradient(135deg, #{$primary-color} 0%, #{$primary-light} 100%);
+  border-radius: 20px;
+  padding: 32px 20px;
+  text-align: center;
+  margin-bottom: 20px;
+  box-shadow: 0 8px 24px rgba(37, 99, 235, 0.25);
+  position: relative;
   overflow: hidden;
-  box-shadow: 0 12px 26px rgba(0, 0, 0, 0.08);
 
-  ion-card-content {
-    background: linear-gradient(135deg, #2563eb 0%, #3b82f6 100%);
-    color: #fff;
+  &::before {
+    content: '';
+    position: absolute;
+    top: -50%;
+    left: -50%;
+    width: 200%;
+    height: 200%;
+    background: radial-gradient(circle, rgba(255,255,255,0.1) 0%, transparent 60%);
+    pointer-events: none;
   }
- }
+}
 
- .profile-header {
-  display: flex;
-  align-items: center;
-  gap: 14px;
- }
+.profile-image-wrapper {
+  position: relative;
+  width: 100px;
+  height: 100px;
+  margin: 0 auto 16px;
+  cursor: pointer;
+}
 
-.avatar-large {
-  width: 72px;
-  height: 72px;
+.profile-image {
+  width: 100px;
+  height: 100px;
   border-radius: 50%;
-  background: rgba(255, 255, 255, 0.22);
-  color: white;
+  background: rgba(255, 255, 255, 0.25);
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 30px;
+  font-size: 40px;
   font-weight: 900;
-  box-shadow: 0 10px 22px rgba(0, 0, 0, 0.12);
-  border: 2px solid rgba(255, 255, 255, 0.25);
+  color: white;
+  border: 3px solid rgba(255, 255, 255, 0.4);
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+  transition: transform 0.2s ease;
+  cursor: pointer;
+
+  &:hover {
+    transform: scale(1.05);
+  }
 }
 
- .profile-text {
-  min-width: 0;
- }
+.camera-overlay {
+  position: absolute;
+  bottom: 0;
+  right: 0;
+  width: 32px;
+  height: 32px;
+  background: #{$accent-color};
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 2px solid white;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+  cursor: pointer;
 
- .profile-name {
-  font-size: 18px;
-  font-weight: 900;
-  letter-spacing: -0.2px;
-  line-height: 1.2;
- }
+  ion-icon {
+    font-size: 16px;
+    color: white;
+  }
+}
 
- .profile-email {
-  margin-top: 4px;
+.remove-photo-btn {
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 28px;
+  height: 28px;
+  background: #{$danger-color};
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 2px solid white;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+  cursor: pointer;
+  z-index: 10;
+
+  ion-icon {
+    font-size: 14px;
+    color: white;
+  }
+
+  &:hover {
+    background: darken($danger-color, 10%);
+  }
+}
+
+.profile-header-card .profile-name {
+  font-size: 22px;
+  font-weight: 800;
+  color: white;
+  margin: 0 0 4px;
+  letter-spacing: -0.5px;
+}
+
+.profile-header-card .profile-email {
+  font-size: 14px;
+  color: rgba(255, 255, 255, 0.85);
+  margin: 0 0 12px;
+}
+
+.school-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: rgba(255, 255, 255, 0.2);
+  padding: 6px 14px;
+  border-radius: 20px;
   font-size: 13px;
+  color: white;
   font-weight: 600;
-  opacity: 0.9;
- }
 
+  ion-icon {
+    font-size: 16px;
+  }
+}
+
+/* Settings Card */
 .settings-card {
-  margin: 0 0 14px 0;
+  margin: 0 0 16px 0;
   border-radius: 16px;
   overflow: hidden;
-  box-shadow: 0 12px 26px rgba(0, 0, 0, 0.08);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
+  background: #{$bg-white};
 }
 
 .settings-card ion-card-header {
-  padding-bottom: 12px;
-  background: rgba(255, 255, 255, 0.75);
-  border-bottom: 1px solid rgba(17, 24, 39, 0.08);
+  padding: 16px 16px 12px;
+  background: #{$bg-white};
+  border-bottom: 1px solid #{$border-color};
 }
 
 .settings-card ion-card-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
   font-size: 16px;
-  font-weight: 900;
-  color: #111827;
+  font-weight: 700;
+  color: #{$text-primary};
+
+  ion-icon {
+    font-size: 20px;
+    color: #{$primary-color};
+  }
 }
 
 .settings-card ion-card-content {
-  padding-top: 14px;
+  padding: 16px;
 }
 
- .form-grid {
+.form-grid {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: 1fr;
   gap: 12px;
- }
+}
 
- .form-item {
-  --background: rgba(255, 255, 255, 0.92);
-  border-radius: 14px;
-  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.08);
-  --padding-start: 10px;
-  --padding-end: 10px;
-  --inner-padding-end: 10px;
- }
+.form-item {
+  --background: #{$bg-light};
+  border-radius: 12px;
+  --padding-start: 14px;
+  --padding-end: 14px;
+  --inner-padding-end: 0;
+  --min-height: 56px;
+  border: 1px solid rgba(37, 99, 235, 0.1);
+}
 
- .form-item ion-icon {
-  color: #2563eb;
- }
+.form-item ion-icon {
+  color: #{$primary-color};
+  font-size: 20px;
+}
 
- .form-item ion-label {
-  font-weight: 800;
+.form-item ion-label {
+  font-weight: 600;
   font-size: 12px;
-  color: #374151;
- }
+  color: #{$text-secondary};
+  margin-bottom: 4px;
+}
 
- .form-item ion-input,
- .form-item ion-textarea {
-  font-weight: 700;
-  color: #111827;
- }
+.form-item ion-input,
+.form-item ion-textarea {
+  font-weight: 500;
+  color: #{$text-primary};
+  font-size: 15px;
+}
 
- .span-2 {
+.span-2 {
   grid-column: 1 / -1;
- }
+}
 
 .button-group {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 10px;
-  margin-top: 16px;
+  margin-top: 20px;
 }
 
- .primary-btn,
- .secondary-btn {
-  margin: 0;
-  height: 44px;
+.save-btn {
+  --background: linear-gradient(135deg, #{$primary-color} 0%, #{$primary-light} 100%);
   --border-radius: 12px;
-  font-weight: 900;
- }
+  height: 48px;
+  font-weight: 700;
+  font-size: 15px;
+  --box-shadow: 0 4px 12px rgba(37, 99, 235, 0.3);
 
-.info-card {
-  margin: 0 0 14px 0;
+  &:hover {
+    --box-shadow: 0 6px 16px rgba(37, 99, 235, 0.4);
+  }
+}
+
+/* School Card */
+.school-card {
+  margin: 0 0 16px 0;
   border-radius: 16px;
   overflow: hidden;
-  box-shadow: 0 12px 26px rgba(0, 0, 0, 0.08);
-  background: rgba(255, 255, 255, 0.75);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
+  background: #{$bg-white};
 }
 
-.info-card ion-card-header {
-  padding-bottom: 12px;
-  border-bottom: 1px solid rgba(17, 24, 39, 0.08);
+.school-card ion-card-header {
+  padding: 16px 16px 12px;
+  background: #{$bg-white};
+  border-bottom: 1px solid #{$border-color};
 }
 
-.info-card ion-card-title {
-  font-size: 16px;
-  font-weight: 900;
-  color: #111827;
-}
-
-.info-card ion-card-content {
-  padding-top: 10px;
-}
-
-.info-row {
+.school-card ion-card-title {
   display: flex;
-  justify-content: space-between;
-  padding: 12px 0;
-  border-bottom: 1px solid rgba(17, 24, 39, 0.08);
   align-items: center;
+  gap: 8px;
+  font-size: 16px;
+  font-weight: 700;
+  color: #{$text-primary};
+
+  ion-icon {
+    font-size: 20px;
+    color: #{$accent-color};
+  }
 }
 
-.info-row:last-child {
-  border-bottom: none;
+.school-card ion-card-content {
+  padding: 16px;
 }
 
-.info-row .label {
-  font-weight: 800;
-  color: #6b7280;
+.school-info-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.info-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 12px;
+  background: #{$bg-light};
+  border-radius: 10px;
+
+  ion-icon {
+    font-size: 22px;
+    color: #{$primary-color};
+    margin-top: 2px;
+  }
+}
+
+.info-content {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.info-label {
+  font-size: 12px;
+  color: #{$text-secondary};
+  font-weight: 500;
+}
+
+.info-value {
   font-size: 14px;
+  color: #{$text-primary};
+  font-weight: 600;
 }
 
-.info-row .value {
-  color: #111827;
-  font-weight: 800;
-  font-size: 14px;
-}
-
+/* Loading */
 .loading-spinner {
   display: flex;
   justify-content: center;
   align-items: center;
   height: 100vh;
-  --color: #2563eb;
+  --color: #{$primary-color};
 }
 
+/* Responsive */
 @media (max-width: 576px) {
   .settings-container {
-    padding: 12px;
+    padding: 16px;
   }
 
-  .form-grid {
-    grid-template-columns: 1fr;
+  .profile-header-card {
+    padding: 24px 16px;
   }
 
-  .button-group {
-    grid-template-columns: 1fr;
+  .profile-image-wrapper,
+  .profile-image {
+    width: 80px;
+    height: 80px;
+  }
+
+  .profile-image {
+    font-size: 32px;
+  }
+
+  .profile-header-card .profile-name {
+    font-size: 20px;
+  }
+}
+
+/* Dark Mode */
+@media (prefers-color-scheme: dark) {
+  .settings-content {
+    --background: linear-gradient(135deg, #0f172a 0%, #1e293b 50%, #0f172a 100%);
+  }
+
+  .settings-card,
+  .school-card {
+    background: #1e293b;
+  }
+
+  .settings-card ion-card-header,
+  .school-card ion-card-header {
+    background: #1e293b;
+    border-bottom-color: rgba(255, 255, 255, 0.1);
+  }
+
+  .settings-card ion-card-title,
+  .school-card ion-card-title {
+    color: #f1f5f9;
+  }
+
+  .form-item {
+    --background: rgba(255, 255, 255, 0.05);
+    border-color: rgba(255, 255, 255, 0.1);
+  }
+
+  .form-item ion-input,
+  .form-item ion-textarea {
+    color: #f1f5f9;
+  }
+
+  .info-item {
+    background: rgba(255, 255, 255, 0.05);
+  }
+
+  .info-value {
+    color: #f1f5f9;
   }
 }

@@ -1083,7 +1083,8 @@ export class TeacherService {
         name: profileData?.name ?? '',
         email: profileData?.email ?? '',
         schoolId: profileData?.schoolId ?? '',
-        bio: profileData?.bio ?? ''
+        bio: profileData?.bio ?? '',
+        photoURL: profileData?.photoURL ?? null
       };
 
       await setDoc(doc(db, 'users', teacherId), {

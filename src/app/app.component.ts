@@ -9,6 +9,7 @@ import { AuthService, User } from './services/auth.service';
 import { RouterModule } from '@angular/router';
 import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
+import { TeacherService } from './services/teacher.service';
 
 @Component({
   selector: 'app-root',
@@ -23,14 +24,17 @@ export class AppComponent {
     @Input() menuId: string = 'main';
   
     currentUser: User | null = null;
+    profilePhotoUrl: string | null = null;
+
   constructor(
     private platform: Platform,
     private cameraService: CameraService,
     private authService: AuthService,
+    private teacherService: TeacherService,
     private navCtrl: NavController,
     private menuController: MenuController,
     private alertController: AlertController,
-    private router: Router // 👈 ADD THIS
+    private router: Router
   ) {
     this.initializeApp();
     this.currentUser = this.authService.getCurrentUser();
@@ -45,20 +49,68 @@ export class AppComponent {
 
   try {
     await this.authService.checkAuth();
-    this.currentUser = this.authService.getCurrentUser(); // ⭐ ADD THIS
+    this.currentUser = this.authService.getCurrentUser();
+    // Load profile photo on app start
+    await this.loadProfilePhoto();
   } catch (err) {
     console.error('AuthService checkAuth error:', err);
   }
 
   await this.platform.ready();
+
+  // Subscribe to auth changes to update menu state
+  this.authService.auth$.subscribe(state => {
+    this.currentUser = state.user;
+    this.updateMenuState();
+    this.loadProfilePhoto();
+  });
+
+  // Subscribe to router events to update menu based on route
+  this.router.events.subscribe(() => {
+    this.updateMenuState();
+    // Refresh profile photo when navigating (e.g., returning from settings)
+    if (!this.isAdminRoute()) {
+      this.loadProfilePhoto();
+    }
+  });
 }
-ionViewWillEnter() {
-  this.menuController.enable(true, 'main');
-  this.menuController.enable(false, 'admin-menu');
-}
+
+  updateMenuState() {
+    const isAdmin = this.authService.isAdmin();
+    const isAdminRoute = this.isAdminRoute();
+
+    if (isAdmin && isAdminRoute) {
+      // Admin on admin route: enable admin menu, disable main menu
+      this.menuController.enable(true, 'admin-menu');
+      this.menuController.enable(false, 'main');
+    } else if (!isAdmin && !isAdminRoute) {
+      // Teacher on teacher route: enable main menu, disable admin menu
+      this.menuController.enable(true, 'main');
+      this.menuController.enable(false, 'admin-menu');
+    } else {
+      // Mismatch (admin on teacher route or vice versa): disable both
+      this.menuController.enable(false, 'main');
+      this.menuController.enable(false, 'admin-menu');
+    }
+  }
+
   isAdminRoute(): boolean {
-  return this.router.url.startsWith('/admin');
-}
+    return this.router.url.startsWith('/admin');
+  }
+
+  async loadProfilePhoto() {
+    try {
+      const result = await this.teacherService.getMyProfile();
+      if (result.success && result.profile?.photoURL) {
+        this.profilePhotoUrl = result.profile.photoURL;
+      } else {
+        this.profilePhotoUrl = null;
+      }
+    } catch (err) {
+      console.error('Error loading profile photo:', err);
+      this.profilePhotoUrl = null;
+    }
+  }
   
     async ngOnInit() {
       try {

@@ -705,10 +705,21 @@ export class ScanPage implements AfterViewInit, OnDestroy {
 
     this.isSaving = true;
     try {
+      await LocalDataService.load();
+      LocalDataService.debugLog();
       const subject = LocalDataService.getSubject(this.classId, this.subjectId);
+      console.log('=== SCAN SAVE DEBUG ===');
+      console.log('classId:', this.classId, 'subjectId:', this.subjectId);
+      console.log('subject:', subject);
+      console.log('subject?.tos:', subject?.tos);
+      console.log('subject?.tosRows:', subject?.tosRows);
       const tos = subject?.tos || [];
       const tosRows = subject?.tosRows || LocalDataService.generateTOSRows(tos);
       const tosMap = LocalDataService.generateTOSMap(tos);
+      console.log('tos length:', tos.length);
+      console.log('tosRows length:', tosRows.length);
+      console.log('tosMap length:', tosMap.length);
+      console.log('======================');
 
       const answers: AnswerEntry[] = this.gradingResults.map((r, i) => {
         const mapEntry = tosMap[r.questionNumber - 1];
