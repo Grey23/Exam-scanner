@@ -1,0 +1,23 @@
+{
+  "indexes": [],
+  "fieldOverrides": [
+    {
+      "collectionGroup": "results",
+      "fieldPath": "createdAt",
+      "indexes": [
+        {
+          "order": "ASCENDING"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "subjects",
+      "fieldPath": "questionsUpdatedAt",
+      "indexes": [
+        {
+          "order": "ASCENDING"
+        }
+      ]
+    }
+  ]
+}

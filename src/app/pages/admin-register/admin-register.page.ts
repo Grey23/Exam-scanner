@@ -4,24 +4,20 @@ import { AuthService } from '../../services/auth.service';
 import { ToastController } from '@ionic/angular';
 
 @Component({
-  selector: 'app-register',
-  templateUrl: './register.page.html',
-  styleUrls: ['./register.page.scss'],
+  selector: 'app-admin-register',
+  templateUrl: './admin-register.page.html',
+  styleUrls: ['./admin-register.page.scss'],
   standalone: false
 })
-export class RegisterPage {
+export class AdminRegisterPage {
   email = '';
   password = '';
   confirmPassword = '';
   name = '';
-  teacherId = '';
+  schoolName = '';
   isLoading = false;
   showPassword = false;
   showConfirmPassword = false;
-  validatingTeacherId = false;
-  teacherIdValid: boolean | null = null;
-  teacherIdMessage = '';
-  verifiedTeacherName = '';
 
   constructor(
     private authService: AuthService,
@@ -29,49 +25,13 @@ export class RegisterPage {
     private toastController: ToastController
   ) {}
 
-  async validateTeacherId() {
-    if (!this.teacherId.trim()) {
-      this.teacherIdValid = null;
-      this.teacherIdMessage = '';
-      this.verifiedTeacherName = '';
-      return;
-    }
-
-    this.validatingTeacherId = true;
-    this.teacherIdValid = null;
-    this.teacherIdMessage = '';
-
-    try {
-      const result = await this.authService.checkTeacherId(this.teacherId.trim());
-      if (result.success && result.data) {
-        this.teacherIdValid = result.data.valid;
-        this.teacherIdMessage = result.data.reason || '';
-        if (result.data.valid && result.data.name) {
-          this.verifiedTeacherName = result.data.name;
-          // Auto-fill name from verified teacher
-          this.name = result.data.name;
-        } else {
-          this.verifiedTeacherName = '';
-        }
-      } else {
-        this.teacherIdValid = false;
-        this.teacherIdMessage = result.message || 'Failed to verify Teacher ID';
-      }
-    } catch (err) {
-      this.teacherIdValid = false;
-      this.teacherIdMessage = 'Failed to verify Teacher ID';
-    } finally {
-      this.validatingTeacherId = false;
-    }
-  }
-
   async register() {
-    console.log('=== REGISTRATION STARTED ===');
+    console.log('=== ADMIN REGISTRATION STARTED ===');
     console.log('Email:', this.email);
     console.log('Name:', this.name);
-    console.log('Teacher ID:', this.teacherId);
+    console.log('School Name:', this.schoolName);
 
-    if (!this.email || !this.password || !this.confirmPassword || !this.name) {
+    if (!this.email || !this.password || !this.confirmPassword || !this.name || !this.schoolName) {
       console.log('Missing required fields');
       this.showToast('Please fill in all required fields');
       return;
@@ -89,16 +49,6 @@ export class RegisterPage {
       return;
     }
 
-    // Teacher ID validation
-    if (!this.teacherId.trim()) {
-      this.showToast('Teacher ID is required');
-      return;
-    }
-    if (this.teacherIdValid === false) {
-      this.showToast(this.teacherIdMessage || 'Invalid Teacher ID');
-      return;
-    }
-
     console.log('All validations passed, sending registration request...');
     this.isLoading = true;
     try {
@@ -107,18 +57,18 @@ export class RegisterPage {
         this.email,
         this.password,
         this.name,
-        'teacher',
-        '',
-        this.teacherId.trim()
+        'admin',
+        this.schoolName,
+        undefined
       );
 
       console.log('Registration result:', result);
 
       if (result.success) {
-        console.log('Registration successful!');
-        this.showToast('Registration successful!');
-        console.log('Navigating to teacher-dashboard...');
-        this.router.navigate(['/teacher-dashboard']);
+        console.log('Admin registration successful!');
+        this.showToast('Admin account created successfully!');
+        console.log('Navigating to admin-dashboard...');
+        this.router.navigate(['/admin-dashboard']);
       } else {
         console.log('Registration failed:', result.message);
         this.showToast(result.message || 'Registration failed. Please try again.');
@@ -131,7 +81,7 @@ export class RegisterPage {
       this.showToast(errorMsg);
     } finally {
       this.isLoading = false;
-      console.log('=== REGISTRATION COMPLETED ===');
+      console.log('=== ADMIN REGISTRATION COMPLETED ===');
     }
   }
 
@@ -145,13 +95,6 @@ export class RegisterPage {
 
   toggleConfirmPasswordVisibility() {
     this.showConfirmPassword = !this.showConfirmPassword;
-  }
-
-  onUserTypeChange() {
-    // Reset teacher ID validation when switching user type
-    this.teacherIdValid = null;
-    this.teacherIdMessage = '';
-    this.verifiedTeacherName = '';
   }
 
   private async showToast(message: string) {

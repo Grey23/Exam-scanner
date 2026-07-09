@@ -14,11 +14,14 @@ import { FormsModule } from '@angular/forms';
 
 @NgModule({
   bootstrap: [AppComponent],
+  declarations: [AppComponent],
   imports: [
     BrowserModule,
     IonicModule.forRoot(),
     AppRoutingModule,
-    HttpClientModule
+    HttpClientModule,
+    CommonModule,
+    FormsModule
   ],
   providers: [{ provide: RouteReuseStrategy, useClass: IonicRouteStrategy }]
 })

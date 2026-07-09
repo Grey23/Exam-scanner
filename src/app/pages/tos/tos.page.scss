@@ -66,47 +66,183 @@
 
  .mode-segment {
   margin-bottom: 12px;
-  background: rgba(255, 255, 255, 0.7);
-  border-radius: 14px;
-  padding: 6px;
-  box-shadow: 0 8px 18px rgba(0, 0, 0, 0.06);
+  background: rgba(255, 255, 255, 0.98);
+  border-radius: 18px;
+  padding: 10px 10px;
+  box-shadow: 0 10px 26px rgba(15, 23, 42, 0.08);
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: space-between;
+  overflow: hidden;
  }
 
- .section-header {
-  margin: 12px 2px 10px;
+ .mode-segment ion-segment-button {
+  flex: 1 1 calc(50% - 8px);
+  max-width: calc(50% - 8px);
+  min-width: 0;
+  padding: 14px 10px;
+  font-size: 0.85rem;
+  font-weight: 700;
+  white-space: normal;
+  justify-content: center;
+  align-items: center;
+  border-radius: 14px;
+  min-height: 56px;
+ }
 
-  &.center {
+ .mode-segment ion-segment-button .button-inner,
+ .mode-segment ion-segment-button ion-label,
+ .mode-segment ion-segment-button .segment-button-inner {
+  white-space: normal !important;
+  overflow: visible !important;
+  text-overflow: clip !important;
+  line-height: 1.2;
+ }
+
+ .mode-segment ion-segment-button:not(.ion-selected) {
+  background: rgba(15, 23, 42, 0.05);
+  color: #111827;
+ }
+
+ .mode-segment ion-segment-button.ion-selected {
+  background: #2563eb;
+  color: #ffffff;
+  box-shadow: 0 8px 20px rgba(37, 99, 235, 0.16);
+ }
+
+ .context-card .context-block {
+  min-width: 0;
+ }
+
+ @media (max-width: 768px) {
+  .context-card {
+    .context-row {
+      grid-template-columns: 1fr;
+    }
+
+    .summary-row {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+  }
+
+  .participation-metrics,
+  .performance-categories .category-boxes,
+  .tos-meta-grid,
+  .tos-bloom-grid,
+  .tos-totals-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .cognitive-bar {
+    grid-template-columns: 1fr;
+    .bar-value {
+      text-align: left;
+      margin-top: 8px;
+      width: 100%;
+    }
+  }
+
+  .not-scanned-list {
+    flex-direction: column;
+  }
+
+  .mode-segment {
+    padding: 8px 6px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  .mode-segment ion-segment-button {
+    flex: 1 1 100%;
+    max-width: 100%;
+    min-width: 0;
+    font-size: 0.92rem;
+    padding: 14px 12px;
+    white-space: normal;
     text-align: center;
   }
+}
 
-  .section-title {
-    font-size: 18px;
-    font-weight: 900;
-    color: #0f172a;
-    letter-spacing: -0.3px;
-  }
+.response-help-text {
+  margin: 0 0 12px;
+  color: var(--ion-color-medium);
+  font-size: 0.95rem;
+}
 
-  .section-subtitle {
-    margin-top: 4px;
-    font-size: 13px;
-    font-weight: 600;
-    color: #64748b;
-  }
- }
+.response-list {
+  display: grid;
+  gap: 12px;
+}
 
- .add-topic-btn {
-  --border-radius: 12px;
-  height: 44px;
+.response-question-card {
+  padding: 14px;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.75);
+  border: 1px solid rgba(37, 99, 235, 0.12);
+}
+
+.response-question-title {
+  font-size: 1rem;
   font-weight: 800;
- }
+  margin-bottom: 4px;
+}
 
- .primary-action {
-  --border-radius: 12px;
-  height: 46px;
-  font-weight: 800;
- }
+.response-correct-answer {
+  font-size: 0.95rem;
+  color: var(--ion-color-primary);
+  margin-bottom: 8px;
+}
 
- .answersheet-shell {
+.response-group {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.response-option-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 8px 10px;
+  border-radius: 12px;
+  background: rgba(37, 99, 235, 0.06);
+}
+
+.response-option-label {
+  font-weight: 700;
+  min-width: 24px;
+  color: var(--ion-color-primary);
+}
+
+.response-student-list {
+  flex: 1;
+  color: var(--ion-color-dark);
+  line-height: 1.5;
+}
+
+.response-count-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 30px;
+  height: 26px;
+  padding: 0 8px;
+  border-radius: 999px;
+  background: rgba(37, 99, 235, 0.12);
+  color: var(--ion-color-primary);
+  font-size: 0.85rem;
+  font-weight: 700;
+}
+
+.response-none {
+  color: var(--ion-color-medium);
+  font-style: italic;
+}
+
+.answersheet-shell {
   margin-top: 12px;
   padding: 12px;
   border-radius: 14px;
@@ -115,13 +251,13 @@
   height: calc(100vh - 300px);
   overflow: auto;
   -webkit-overflow-scrolling: touch;
- }
+}
 
- .tos-editor {
+.tos-editor {
   display: grid;
   gap: 12px;
   margin-top: 12px;
- }
+}
 
  .tos-topic-card {
   border-radius: 14px;
@@ -339,7 +475,267 @@
   margin-bottom: 12px;
  }
 
- @media (max-width: 480px) {
+// ========================================
+// Student Participation & Cognitive Dashboard
+// ========================================
+
+.participation-card {
+  margin: 0 0 12px 0;
+  border-radius: 14px;
+  overflow: hidden;
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.08);
+
+  ion-card-header {
+    background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+    color: #fff;
+    padding: 12px 16px;
+  }
+
+  .dashboard-title {
+    font-size: 16px;
+    font-weight: 900;
+    margin: 0;
+  }
+
+  ion-card-content {
+    background: rgba(255, 255, 255, 0.98);
+    padding: 16px;
+  }
+}
+
+.participation-metrics {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  margin-bottom: 16px;
+
+  .metric-box {
+    padding: 14px;
+    border-radius: 12px;
+    text-align: center;
+    border: 2px solid #e5e7eb;
+    min-height: 120px;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    gap: 6px;
+  }
+
+  .metric-label {
+    font-size: 12px;
+    font-weight: 700;
+    margin-bottom: 4px;
+  }
+
+  .metric-value {
+    font-size: 20px;
+    font-weight: 900;
+    line-height: 1.2;
+  }
+
+  .metric-percent {
+    font-size: 13px;
+    font-weight: 700;
+    margin-top: 2px;
+    opacity: 0.8;
+  }
+
+  .not-scanned {
+    background: rgba(239, 68, 68, 0.08);
+    border-color: #ef4444;
+
+    .metric-label {
+      color: #b91c1c;
+    }
+
+    .metric-value {
+      color: #dc2626;
+    }
+  }
+}
+
+.performance-categories {
+  margin-bottom: 16px;
+
+  .category-label {
+    font-size: 13px;
+    font-weight: 800;
+    color: #374151;
+    margin-bottom: 8px;
+  }
+
+  .category-boxes {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 10px;
+  }
+
+  .category-box {
+    padding: 12px;
+    border-radius: 10px;
+    text-align: center;
+    border: 2px solid #e5e7eb;
+  }
+
+  .category-name {
+    font-size: 11px;
+    font-weight: 700;
+    margin-bottom: 4px;
+  }
+
+  .category-count {
+    font-size: 22px;
+    font-weight: 900;
+  }
+
+  .good {
+    background: rgba(34, 197, 94, 0.08);
+    border-color: #22c55e;
+
+    .category-name {
+      color: #15803d;
+    }
+
+    .category-count {
+      color: #22c55e;
+    }
+  }
+
+  .average {
+    background: rgba(245, 158, 11, 0.08);
+    border-color: #f59e0b;
+
+    .category-name {
+      color: #b45309;
+    }
+
+    .category-count {
+      color: #f59e0b;
+    }
+  }
+
+  .struggling {
+    background: rgba(239, 68, 68, 0.08);
+    border-color: #ef4444;
+
+    .category-name {
+      color: #b91c1c;
+    }
+
+    .category-count {
+      color: #ef4444;
+    }
+  }
+}
+
+.cognitive-breakdown {
+  margin-bottom: 16px;
+
+  .cognitive-label {
+    font-size: 13px;
+    font-weight: 800;
+    color: #374151;
+    margin-bottom: 10px;
+  }
+
+  .cognitive-bars {
+    display: grid;
+    gap: 12px;
+
+    .cognitive-bar {
+      display: grid;
+      grid-template-columns: 60px 1fr 90px;
+      align-items: center;
+      gap: 10px;
+
+      .bar-label {
+        font-size: 12px;
+        font-weight: 700;
+        color: #374151;
+        text-align: left;
+      }
+
+      .bar-container {
+        width: 100%;
+        height: 24px;
+        background: #e5e7eb;
+        border-radius: 6px;
+        overflow: hidden;
+        position: relative;
+
+        .bar-fill {
+          height: 100%;
+          border-radius: 6px;
+          transition: width 0.3s ease;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          font-size: 11px;
+          font-weight: 700;
+          color: #fff;
+
+          &.color-success {
+            background: linear-gradient(90deg, #10b981, #059669);
+          }
+
+          &.color-warning {
+            background: linear-gradient(90deg, #f59e0b, #d97706);
+          }
+
+          &.color-danger {
+            background: linear-gradient(90deg, #ef4444, #dc2626);
+          }
+        }
+      }
+
+      .bar-value {
+        font-size: 12px;
+        font-weight: 700;
+        color: #111827;
+        text-align: right;
+      }
+    }
+  }
+}
+
+.not-scanned-students {
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 2px solid #e5e7eb;
+
+  .not-scanned-label {
+    font-size: 13px;
+    font-weight: 800;
+    color: #374151;
+    margin-bottom: 10px;
+  }
+
+  .not-scanned-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+
+    .student-tag {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      padding: 6px 12px;
+      background: rgba(239, 68, 68, 0.1);
+      border: 1px solid #fca5a5;
+      border-radius: 20px;
+      font-size: 12px;
+      font-weight: 600;
+      color: #b91c1c;
+
+      .roll-number {
+        font-size: 10px;
+        opacity: 0.8;
+      }
+    }
+  }
+}
+
+ @media (max-width: 768px) {
   .context-card {
     .context-row {
       grid-template-columns: 1fr;
@@ -348,6 +744,75 @@
     .summary-row {
       grid-template-columns: repeat(2, minmax(0, 1fr));
     }
+  }
+
+  .mode-segment {
+    padding: 8px 8px;
+  }
+
+  .participation-metrics,
+  .performance-categories .category-boxes,
+  .tos-meta-grid,
+  .tos-bloom-grid,
+  .tos-totals-grid,
+  .student-summary-row {
+    grid-template-columns: 1fr;
+  }
+
+  .metric-box,
+  .category-box,
+  .tos-total {
+    min-height: auto;
+  }
+
+  .cognitive-bar {
+    grid-template-columns: 1fr;
+
+    .bar-label {
+      margin-bottom: 6px;
+    }
+
+    .bar-value {
+      grid-column: 1 / -1;
+      text-align: left;
+      margin-top: 8px;
+    }
+  }
+
+  .not-scanned-list {
+    flex-direction: column;
+  }
+
+  .topic-tags {
+    flex-direction: column;
+  }
+
+  .section-header {
+    margin: 10px 0 8px;
+  }
+
+  .section-title {
+    font-size: 16px;
+  }
+
+  .section-subtitle {
+    font-size: 12px;
+  }
+
+  .print-scroll {
+    padding: 12px;
+  }
+
+  input[type='number'] {
+    max-width: 100px;
+  }
+
+  .table-scroll {
+    overflow-x: auto;
+  }
+
+  table {
+    min-width: unset;
   }
  }
 
@@ -406,5 +871,132 @@
   @page {
     size: landscape;
     margin: 20mm;
+  }
+}
+
+// ========================================
+// Help Modal Styling
+// ========================================
+
+::ng-deep .help-modal {
+  ion-modal {
+    --backdrop-opacity: 0.8;
+    --border-radius: 14px;
+    --box-shadow: 0 10px 30px rgba(0, 0, 0, 0.15);
+
+    ion-header {
+      ion-toolbar {
+        --background: linear-gradient(135deg, #2563eb 0%, #3b82f6 100%);
+        --border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+
+        ion-title {
+          color: #fff;
+          font-weight: 900;
+          font-size: 18px;
+          letter-spacing: -0.3px;
+        }
+
+        ion-button {
+          --color: #fff;
+        }
+
+        ion-icon {
+          font-size: 24px;
+        }
+      }
+    }
+
+    ion-content {
+      --background: #fff;
+
+      div {
+        color: #334155;
+        font-size: 14px;
+        line-height: 1.7;
+
+        p {
+          margin: 12px 0;
+
+          &:first-child {
+            margin-top: 0;
+          }
+
+          &:last-child {
+            margin-bottom: 0;
+          }
+
+          strong {
+            color: #1e40af;
+            font-weight: 700;
+          }
+        }
+
+        ul {
+          margin: 12px 0;
+          padding-left: 24px;
+
+          li {
+            margin: 8px 0;
+
+            strong {
+              color: #1e40af;
+              font-weight: 700;
+            }
+          }
+        }
+      }
+    }
+  }
+}
+
+// ========================================
+// Student List Modal Styling
+// ========================================
+
+::ng-deep .student-list-modal {
+  ion-modal {
+    --backdrop-opacity: 0.8;
+    --border-radius: 14px;
+    --box-shadow: 0 10px 30px rgba(0, 0, 0, 0.15);
+
+    ion-header {
+      ion-toolbar {
+        --background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+        --border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+
+        ion-title {
+          color: #fff;
+          font-weight: 900;
+          font-size: 17px;
+          letter-spacing: -0.2px;
+        }
+
+        ion-button {
+          --color: #fff;
+        }
+
+        ion-icon {
+          font-size: 24px;
+        }
+      }
+    }
+
+    ion-content {
+      --background: #fff;
+
+      ion-list {
+        ion-item {
+          --padding-start: 16px;
+          --padding-end: 16px;
+          --padding-top: 12px;
+          --padding-bottom: 12px;
+          --border-color: #e5e7eb;
+
+          ion-label {
+            margin: 0;
+          }
+        }
+      }
+    }
   }
 }

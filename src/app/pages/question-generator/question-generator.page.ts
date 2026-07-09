@@ -1,4 +1,4 @@
-import { Component, OnInit } from '@angular/core';
+import { Component, ElementRef, OnInit, ViewChild } from '@angular/core';
 import { ActivatedRoute } from '@angular/router';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
@@ -18,6 +18,8 @@ declare const pdfjsLib: any;
   imports: [CommonModule, FormsModule, IonicModule]
 })
 export class QuestionGeneratorPage implements OnInit {
+  @ViewChild('pdfInput') pdfInputRef!: ElementRef<HTMLInputElement>;
+
   classId!: number;
   subjectId!: number;
   className = '';
@@ -53,6 +55,10 @@ export class QuestionGeneratorPage implements OnInit {
   isChatOpen = false;
   chatMessages: { role: 'user' | 'gemini'; text: string; ts: number }[] = [];
   isImportingPdf = false;
+  pendingPdfFile: File | null = null;
+  pendingPdfFileName = '';
+  pendingPdfFileSize = '';
+  showPdfConfirmation = false;
 
   constructor(
     private route: ActivatedRoute,
@@ -81,6 +87,45 @@ export class QuestionGeneratorPage implements OnInit {
     await alert.present();
     const res = await alert.onDidDismiss();
     return res.role === 'confirm';
+  }
+
+  private formatFileSize(bytes: number): string {
+    if (!Number.isFinite(bytes) || bytes <= 0) return '0 KB';
+    const units = ['B', 'KB', 'MB', 'GB'];
+    let size = bytes;
+    let unitIndex = 0;
+    while (size >= 1024 && unitIndex < units.length - 1) {
+      size /= 1024;
+      unitIndex++;
+    }
+    return `${size.toFixed(size >= 10 || unitIndex === 0 ? 0 : 1)} ${units[unitIndex]}`;
+  }
+
+  setPendingPdfFile(file: File | null) {
+    this.pendingPdfFile = file;
+    this.showPdfConfirmation = !!file;
+    this.pendingPdfFileName = file?.name || '';
+    this.pendingPdfFileSize = file ? this.formatFileSize(file.size) : '';
+  }
+
+  cancelPendingPdfSelection() {
+    this.setPendingPdfFile(null);
+  }
+
+  async chooseAnotherPdfFile() {
+    this.setPendingPdfFile(null);
+    setTimeout(() => {
+      this.pdfInputRef?.nativeElement?.click();
+    }, 0);
+  }
+
+  confirmPendingPdfSelection() {
+    if (!this.pendingPdfFile) return;
+    this.showPdfConfirmation = false;
+    void this.generateFromPdf(this.pendingPdfFile);
+    this.pendingPdfFile = null;
+    this.pendingPdfFileName = '';
+    this.pendingPdfFileSize = '';
   }
 
   private normalizeTosRow(row: any): TopicEntry | null {
@@ -716,7 +761,12 @@ export class QuestionGeneratorPage implements OnInit {
       input.value = '';
     }
 
-    await this.generateFromPdf(file);
+    if (!file.type || !file.type.includes('pdf')) {
+      await this.presentAlert('Please select a PDF file.');
+      return;
+    }
+
+    this.setPendingPdfFile(file);
   }
 
   private async generateFromPdf(file: File) {

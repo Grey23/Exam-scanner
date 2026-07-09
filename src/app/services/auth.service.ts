@@ -86,6 +86,11 @@ export class AuthService {
 
     try {
 
+      // Avoid overwriting a newer authenticated state (e.g., login just completed)
+      if (this.authSubject.value.isAuthenticated && this.authSubject.value.user) {
+        return;
+      }
+
       const stored = await Preferences.get({ key: 'currentUser' });
 
       const storedToken = await Preferences.get({ key: 'authToken' });
@@ -374,15 +379,27 @@ export class AuthService {
       return { success: true, message: 'Login successful' };
 
     } catch (err: any) {
+      let errorMessage = 'Login failed. Please check your email and password.';
 
-      const errorMessage = err?.message || 'Login failed';
+      const code = err?.code || err?.message || '';
+      if (typeof code === 'string') {
+        if (code.includes('auth/invalid-email')) {
+          errorMessage = 'Please enter a valid email address.';
+        } else if (code.includes('auth/user-not-found') || code.includes('auth/wrong-password')) {
+          errorMessage = 'Wrong email or password.';
+        } else if (code.includes('auth/too-many-requests')) {
+          errorMessage = 'Too many failed login attempts. Please try again later.';
+        } else if (code.includes('auth/network-request-failed')) {
+          errorMessage = 'Network error. Please check your internet connection.';
+        } else if (code.includes('auth/invalid-email')) {
+          errorMessage = 'Please enter a valid email address.';
+        }
+      }
 
       return { success: false, message: errorMessage };
-
     }
 
     return { success: false, message: 'Login failed' };
-
   }
 
 

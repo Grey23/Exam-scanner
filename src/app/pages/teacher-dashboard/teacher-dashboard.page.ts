@@ -8,6 +8,7 @@ import { TeacherService, ClassData } from '../../services/teacher.service';
 import { Gesture, GestureController } from '@ionic/angular';
 import { Preferences } from '@capacitor/preferences';
 import Chart from 'chart.js/auto';
+import type { Subscription } from 'rxjs';
 
 export interface DashboardData {
   totalClasses: number;
@@ -35,6 +36,7 @@ export class TeacherDashboardPage implements OnInit, AfterViewInit, OnDestroy {
   isLoading = false;
   showWelcomeCheck = false;
   classes: ClassData[] = [];
+  private authSub?: Subscription;
   private gestures: Gesture[] = [];
   private suppressNextClassClick = false;
   private classOrderIds: number[] = [];
@@ -66,6 +68,9 @@ export class TeacherDashboardPage implements OnInit, AfterViewInit, OnDestroy {
   }
 
   ngOnInit() {
+    this.authSub = this.authService.auth$.subscribe((state) => {
+      this.currentUser = state.user;
+    });
     this.loadData();
   }
 
@@ -84,6 +89,11 @@ export class TeacherDashboardPage implements OnInit, AfterViewInit, OnDestroy {
 
 
   ngOnDestroy() {
+    try {
+      this.authSub?.unsubscribe();
+    } catch {
+      // ignore
+    }
     this.destroyGestures();
   }
 

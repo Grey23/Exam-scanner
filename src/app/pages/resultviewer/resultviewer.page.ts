@@ -1,4 +1,4 @@
-import { Component, OnInit, AfterViewInit, NgZone } from '@angular/core';
+import { Component, OnInit, AfterViewInit, NgZone, OnDestroy, ChangeDetectionStrategy, ChangeDetectorRef } from '@angular/core';
 import { ActivatedRoute } from '@angular/router';
 import { CommonModule } from '@angular/common';
 import { IonicModule } from '@ionic/angular';
@@ -12,6 +12,7 @@ import Chart from 'chart.js/auto';
 import { HttpClientModule } from '@angular/common/http';
 import { TopicEntry } from '../../services/local-data.service';
 import { TeacherService } from '../../services/teacher.service';
+import { ModalController } from '@ionic/angular';
 
 
 interface TosRowAnalysis {
@@ -33,8 +34,9 @@ interface TosRowAnalysis {
   styleUrls: ['./resultviewer.page.scss'],
   standalone: true,
   imports: [IonicModule, CommonModule, FormsModule, HttpClientModule],
+  changeDetection: ChangeDetectionStrategy.OnPush,
 })
-export class ResultviewerPage implements OnInit, AfterViewInit {
+export class ResultviewerPage implements OnInit, AfterViewInit, OnDestroy {
   classId!: number;
   subjectId!: number;
   resultId!: number;
@@ -44,6 +46,40 @@ export class ResultviewerPage implements OnInit, AfterViewInit {
 
   tosAnalysis: TosRowAnalysis[] = [];
   tosRowView: any[] = [];
+
+  // Tab switching
+  activeTab: 'details' | 'statistics' | 'review' | 'responses' = 'details';
+  reviewFilterQuery = '';
+  reviewFilterType: 'all' | 'correct' | 'incorrect' = 'all';
+  responseOptions: Array<'A' | 'B' | 'C' | 'D'> = ['A', 'B', 'C', 'D'];
+
+  // Statistics data
+  allResults: ScannedResult[] = [];
+  statistics: {
+    minScore: number;
+    maxScore: number;
+    averageScore: number;
+    medianScore: number;
+    stdDeviation: number;
+    minPercentage: number;
+    maxPercentage: number;
+    averagePercentage: number;
+    medianPercentage: number;
+    stdDeviationPercentage: number;
+    totalStudents: number;
+  } = {
+    minScore: 0,
+    maxScore: 0,
+    averageScore: 0,
+    medianScore: 0,
+    stdDeviation: 0,
+    minPercentage: 0,
+    maxPercentage: 0,
+    averagePercentage: 0,
+    medianPercentage: 0,
+    stdDeviationPercentage: 0,
+    totalStudents: 0
+  };
 
   topicBreakdownData: {
     topic: string;
@@ -63,7 +99,9 @@ export class ResultviewerPage implements OnInit, AfterViewInit {
   constructor(
     private route: ActivatedRoute,
     private teacherService: TeacherService,
-    private ngZone: NgZone
+    private ngZone: NgZone,
+    private cdr: ChangeDetectorRef,
+    private modalController: ModalController
   ) {}
 
   ngOnInit() {
@@ -83,28 +121,37 @@ export class ResultviewerPage implements OnInit, AfterViewInit {
             }
           } catch {}
 
+          // Load all results for statistics
+          const subject = LocalDataService.getSubject(this.classId, this.subjectId);
+          const rawResults = subject?.results || [];
+          // Deduplicate results by student ID/roll number - keep only the latest scan for each student
+          this.allResults = this.deduplicateResults(rawResults);
+
           this.meanPercentage = LocalDataService.getMeanPercentage(this.classId, this.subjectId);
+          this.calculateStatistics();
           this.buildTosAnalysis();
           if (this.result?.tosRows) {
             this.tosRowView = this.buildTosRowView(this.result.tosRows);
           }
+          this.cdr.detectChanges();
 
           // Also render charts when loading from state
           setTimeout(() => {
             this.enrichAnswersWithTOS();
-            // TEMPORARILY DISABLE ALL CHARTS to debug hang issue
-            console.log('Charts temporarily disabled for debugging (stateResult path)');
-            // if (this.result?.answers) {
-            //   this.renderAnswerDistributionChart(this.result.answers);
-            //   this.renderCognitiveChart(this.result.answers);
-            //   this.renderCognitiveCombinedChart(this.result.answers);
-            //   this.renderTopicChart(this.result.answers);
-            //   this.renderCompetencyChart(this.result.answers);
-            // }
+            if (this.result?.answers) {
+              requestAnimationFrame(() => {
+                this.renderAnswerDistributionChart(this.result!.answers);
+                this.renderCognitiveChart(this.result!.answers);
+                this.renderCognitiveCombinedChart(this.result!.answers);
+                this.renderTopicChart(this.result!.answers);
+                this.renderCompetencyChart(this.result!.answers);
+              });
+            }
 
             // Render per-topic cognitive breakdown charts after the *ngFor canvases exist
             setTimeout(() => {
               this.renderPerTopicCharts();
+              this.cdr.detectChanges();
             }, 150);
           }, 100);
         });
@@ -136,6 +183,9 @@ export class ResultviewerPage implements OnInit, AfterViewInit {
           // Prefer direct lookup from remote results so this works
           // even if LocalDataService does not yet have a subject entry.
           this.result = res.results.find(r => r.id === this.resultId);
+          const rawResults = res.results || [];
+          // Deduplicate results by student ID/roll number - keep only the latest scan for each student
+          this.allResults = this.deduplicateResults(rawResults);
 
           // Hydrate LocalDataService cache when a subject exists.
           subject = LocalDataService.getSubject(this.classId, this.subjectId);
@@ -146,6 +196,11 @@ export class ResultviewerPage implements OnInit, AfterViewInit {
       } catch (err) {
         console.error('Resultviewer: failed to load results from Firebase', err);
       }
+    } else {
+      // Load all results from local cache for statistics
+      const rawResults = subject?.results || [];
+      // Deduplicate results by student ID/roll number - keep only the latest scan for each student
+      this.allResults = this.deduplicateResults(rawResults);
     }
 
     this.buildTosAnalysis();
@@ -154,25 +209,24 @@ export class ResultviewerPage implements OnInit, AfterViewInit {
     }
 
     this.meanPercentage = LocalDataService.getMeanPercentage(this.classId, this.subjectId);
+    this.calculateStatistics();
+    this.cdr.detectChanges();
 
     // 🔥 ADD THIS HERE (after everything is ready)
     setTimeout(() => {
       this.enrichAnswersWithTOS();
-      const subject = LocalDataService.getSubject(this.classId, this.subjectId);
-
-console.log("SUBJECT:", subject);
-
-      // TEMPORARILY DISABLE ALL CHARTS to debug hang issue
-      console.log('Charts temporarily disabled for debugging');
-      // this.renderAnswerDistributionChart(this.result!.answers);
-      // this.renderCognitiveChart(this.result!.answers);
-      // this.renderCognitiveCombinedChart(this.result!.answers);
-      // this.renderTopicChart(this.result!.answers);
-      // this.renderCompetencyChart(this.result!.answers);
+      requestAnimationFrame(() => {
+        this.renderAnswerDistributionChart(this.result!.answers);
+        this.renderCognitiveChart(this.result!.answers);
+        this.renderCognitiveCombinedChart(this.result!.answers);
+        this.renderTopicChart(this.result!.answers);
+        this.renderCompetencyChart(this.result!.answers);
+      });
 
       // Render per-topic cognitive breakdown charts
       setTimeout(() => {
         this.renderPerTopicCharts();
+        this.cdr.detectChanges();
       }, 50);
     }, 100);
   }
@@ -180,6 +234,20 @@ console.log("SUBJECT:", subject);
 
   ngAfterViewInit() {
    
+  }
+
+  ngOnDestroy() {
+    try {
+      this.answersChart?.destroy();
+      this.cognitiveChart?.destroy();
+      this.cognitiveCombinedChart?.destroy();
+      this.topicChart?.destroy();
+      this.competencyChart?.destroy();
+      this.topicCharts.forEach((c) => c.destroy());
+      this.topicCharts = [];
+    } catch {
+      // ignore
+    }
   }
 
   /** Topics this student is strong at (highest % first). Aggregates by topic name. */
@@ -272,6 +340,238 @@ console.log("SUBJECT:", subject);
       }))
       .sort((a, b) => a.percent - b.percent)
       .slice(0, 3);
+  }
+
+  /** Calculate statistics for all results in the subject */
+  private calculateStatistics() {
+    if (!this.allResults || this.allResults.length === 0) {
+      return;
+    }
+
+    const scores = this.allResults.map(r => r.score);
+    const percentages = this.allResults.map(r => r.total > 0 ? (r.score / r.total) * 100 : 0);
+
+    this.statistics.totalStudents = this.allResults.length;
+    this.statistics.minScore = Math.min(...scores);
+    this.statistics.maxScore = Math.max(...scores);
+    this.statistics.minPercentage = Math.min(...percentages);
+    this.statistics.maxPercentage = Math.max(...percentages);
+
+    // Average
+    const sumScore = scores.reduce((a, b) => a + b, 0);
+    const sumPercentage = percentages.reduce((a, b) => a + b, 0);
+    this.statistics.averageScore = sumScore / scores.length;
+    this.statistics.averagePercentage = sumPercentage / percentages.length;
+
+    // Median
+    const sortedScores = [...scores].sort((a, b) => a - b);
+    const sortedPercentages = [...percentages].sort((a, b) => a - b);
+    const mid = Math.floor(sortedScores.length / 2);
+    this.statistics.medianScore = sortedScores.length % 2 !== 0
+      ? sortedScores[mid]
+      : (sortedScores[mid - 1] + sortedScores[mid]) / 2;
+    this.statistics.medianPercentage = sortedPercentages.length % 2 !== 0
+      ? sortedPercentages[mid]
+      : (sortedPercentages[mid - 1] + sortedPercentages[mid]) / 2;
+
+    // Standard Deviation
+    const varianceScore = scores.reduce((sum, val) => sum + Math.pow(val - this.statistics.averageScore, 2), 0) / scores.length;
+    const variancePercentage = percentages.reduce((sum, val) => sum + Math.pow(val - this.statistics.averagePercentage, 2), 0) / percentages.length;
+    this.statistics.stdDeviation = Math.sqrt(varianceScore);
+    this.statistics.stdDeviationPercentage = Math.sqrt(variancePercentage);
+  }
+
+  /** Switch between tabs */
+  switchTab(tab: 'details' | 'review' | 'statistics' | 'responses') {
+    this.activeTab = tab;
+    
+    // Re-render charts when switching back to details tab
+    if (tab === 'details' && this.result?.answers) {
+      this.ngZone.runOutsideAngular(() => {
+        setTimeout(() => {
+          requestAnimationFrame(() => {
+            this.renderAnswerDistributionChart(this.result!.answers);
+            this.renderCognitiveChart(this.result!.answers);
+            this.renderCognitiveCombinedChart(this.result!.answers);
+            this.renderTopicChart(this.result!.answers);
+            this.renderCompetencyChart(this.result!.answers);
+          });
+          
+          // Re-render per-topic charts
+          setTimeout(() => {
+            this.renderPerTopicCharts();
+            this.cdr.detectChanges();
+          }, 150);
+        }, 100);
+      });
+    }
+  }
+
+  /** Deduplicate results by student ID/roll number - keep only the latest scan for each student */
+  private deduplicateResults(results: ScannedResult[]): ScannedResult[] {
+    const studentMap = new Map<string, ScannedResult>();
+    
+    results.forEach(result => {
+      // Create a unique key for the student using roll number or student name
+      const studentKey = result.rollNumber || result.studentName || `student_${result.id}`;
+      
+      // If we already have a result for this student, keep the one with the latest timestamp
+      const existing = studentMap.get(studentKey);
+      if (!existing || (result.timestamp && existing.timestamp && result.timestamp > existing.timestamp)) {
+        studentMap.set(studentKey, result);
+      }
+    });
+    
+    return Array.from(studentMap.values());
+  }
+
+  /** Calculate cognitive breakdown for a single result */
+  private getCognitiveBreakdown(result: ScannedResult): { level: string; correct: number; total: number; percent: number }[] {
+    if (!result.answers || result.answers.length === 0) return [];
+    
+    const breakdown: { [level: string]: { correct: number; total: number } } = {};
+    
+    result.answers.forEach(answer => {
+      const level = answer.level || 'N/A';
+      if (level === 'N/A') return;
+      
+      if (!breakdown[level]) {
+        breakdown[level] = { correct: 0, total: 0 };
+      }
+      
+      breakdown[level].total++;
+      if (answer.correct) {
+        breakdown[level].correct++;
+      }
+    });
+    
+    return Object.keys(breakdown).map(level => ({
+      level,
+      correct: breakdown[level].correct,
+      total: breakdown[level].total,
+      percent: breakdown[level].total > 0 ? Math.round((breakdown[level].correct / breakdown[level].total) * 100) : 0
+    })).sort((a, b) => b.percent - a.percent); // Sort by percentage descending
+  }
+
+  /** Get weakest cognitive levels for a student (areas needing improvement) */
+  private getWeakestCognitiveLevels(result: ScannedResult): string[] {
+    const breakdown = this.getCognitiveBreakdown(result);
+    return breakdown
+      .filter(c => c.percent < 70 && c.total > 0)
+      .map(c => c.level);
+  }
+
+  /** Get answer distribution percentage for a specific option (A, B, C, D) */
+  getAnswerDistribution(option: string): number {
+    if (!this.result?.answers || this.result.answers.length === 0) return 0;
+    
+    const counts: Record<string, number> = { A: 0, B: 0, C: 0, D: 0 };
+    this.result.answers.forEach(answer => {
+      if (answer.marked) {
+        counts[answer.marked]++;
+      }
+    });
+    
+    const total = Object.values(counts).reduce((sum, count) => sum + count, 0);
+    if (total === 0) return 0;
+    
+    return Math.round((counts[option] / total) * 100);
+  }
+
+  get correctAnswers() {
+    if (!this.result?.answers) return [];
+    return [...this.result.answers]
+      .filter(a => a.correct)
+      .sort((a, b) => a.question - b.question);
+  }
+
+  get incorrectAnswers() {
+    if (!this.result?.answers) return [];
+    return [...this.result.answers]
+      .filter(a => !a.correct)
+      .sort((a, b) => a.question - b.question);
+  }
+
+  get filteredCorrectAnswers() {
+    const query = this.reviewFilterQuery.trim().toLowerCase();
+    return this.correctAnswers.filter(answer => {
+      if (!query) return true;
+      const questionMatch = String(answer.question).includes(query);
+      const topicMatch = String(answer.topic || '').toLowerCase().includes(query);
+      const competencyMatch = String(answer.competency || '').toLowerCase().includes(query);
+      return questionMatch || topicMatch || competencyMatch;
+    });
+  }
+
+  get filteredIncorrectAnswers() {
+    const query = this.reviewFilterQuery.trim().toLowerCase();
+    return this.incorrectAnswers.filter(answer => {
+      if (!query) return true;
+      const questionMatch = String(answer.question).includes(query);
+      const topicMatch = String(answer.topic || '').toLowerCase().includes(query);
+      const competencyMatch = String(answer.competency || '').toLowerCase().includes(query);
+      const correctAnswerMatch = String(answer.correctAnswer || '').toLowerCase().includes(query);
+      return questionMatch || topicMatch || competencyMatch || correctAnswerMatch;
+    });
+  }
+
+  get questionResponseBreakdown(): Array<{
+    question: number;
+    correctAnswer: string | null;
+    responses: Record<'A' | 'B' | 'C' | 'D', Array<{ name: string; rollNumber?: string | null }>>;
+  }> {
+    const answerSources = (this.allResults?.length ? this.allResults : this.result ? [this.result] : []) as ScannedResult[];
+
+    const questionMap = new Map<number, {
+      correctAnswer: string | null;
+      responses: Record<'A' | 'B' | 'C' | 'D', Array<{ name: string; rollNumber?: string | null }>>;
+    }>();
+
+    answerSources.forEach(result => {
+      result.answers?.forEach(answer => {
+        if (answer.question == null) return;
+
+        const question = Number(answer.question);
+        const existing = questionMap.get(question) || {
+          correctAnswer: answer.correctAnswer || null,
+          responses: { A: [], B: [], C: [], D: [] }
+        };
+
+        if (!existing.correctAnswer && answer.correctAnswer) {
+          existing.correctAnswer = answer.correctAnswer;
+        }
+
+        const option = (answer.marked || '').toUpperCase() as 'A' | 'B' | 'C' | 'D';
+        if (['A', 'B', 'C', 'D'].includes(option)) {
+          existing.responses[option].push({
+            name: result.studentName || `Student ${result.id}`,
+            rollNumber: result.rollNumber || null
+          });
+        }
+
+        questionMap.set(question, existing);
+      });
+    });
+
+    return Array.from(questionMap.entries())
+      .sort((a, b) => a[0] - b[0])
+      .map(([question, data]) => ({
+        question,
+        correctAnswer: data.correctAnswer,
+        responses: data.responses
+      }));
+  }
+
+  /** Get accuracy percentage for the current result */
+  getAccuracyPercentage(): number {
+    if (!this.result || this.result.total === 0) return 0;
+    return Math.round((this.result.score / this.result.total) * 100);
+  }
+
+  /** Get incorrect answer count */
+  getIncorrectCount(): number {
+    if (!this.result) return 0;
+    return this.result.total - this.result.score;
   }
 
   /** Per-topic cognitive breakdown - groups TOS analysis by topic with cognitive details */
@@ -553,6 +853,10 @@ buildTosRowView(tosRows: TopicEntry[]): any[] {
     const ctx = document.getElementById('answersChart') as HTMLCanvasElement;
     if (!ctx) return;
 
+    // Set explicit dimensions
+    ctx.width = 300;
+    ctx.height = 200;
+
     if (this.answersChart) this.answersChart.destroy();
 
     const counts: Record<"A" | "B" | "C" | "D", number> = { A: 0, B: 0, C: 0, D: 0 };
@@ -569,21 +873,66 @@ buildTosRowView(tosRows: TopicEntry[]): any[] {
             label: 'Selections',
             data: [counts.A, counts.B, counts.C, counts.D],
             backgroundColor: 'rgba(54, 162, 235, 0.7)',
+            borderColor: 'rgba(54, 162, 235, 1)',
+            borderWidth: 2,
+            borderRadius: 8,
           },
         ],
       },
       options: {
-        responsive: true,
-        plugins: { title: { display: true, text: 'Answer Distribution' } },
-        scales: { y: { beginAtZero: true } },
+        responsive: false,
+        devicePixelRatio: 1,
+        animation: {
+          duration: 500,
+          easing: 'easeOutQuart'
+        },
+        plugins: { 
+          title: { display: true, text: 'Answer Distribution' },
+          tooltip: {
+            backgroundColor: 'rgba(0, 0, 0, 0.8)',
+            padding: 12,
+            titleFont: { size: 14 },
+            bodyFont: { size: 13 },
+            cornerRadius: 8,
+            displayColors: false
+          },
+          legend: {
+            display: false
+          }
+        },
+        scales: { 
+          y: { 
+            beginAtZero: true,
+            ticks: {
+              font: { size: 11 }
+            }
+          },
+          x: {
+            ticks: {
+              font: { size: 12, weight: 'bold' }
+            }
+          }
+        },
+        onClick: (event, elements) => {
+          if (elements.length > 0) {
+            const index = elements[0].index;
+            const label = ['A', 'B', 'C', 'D'][index];
+            const value = counts[label as keyof typeof counts];
+            console.log(`Selected ${label}: ${value} times`);
+          }
+        }
       },
     });
   }
 
-  // ✅ Chart for Bloom’s levels
+  // ✅ Chart for Bloom's levels
   renderCognitiveChart(answers: AnswerEntry[]) {
     const ctx = document.getElementById('cognitiveChart') as HTMLCanvasElement;
     if (!ctx) return;
+
+    // Set explicit dimensions
+    ctx.width = 300;
+    ctx.height = 200;
 
     if (this.cognitiveChart) this.cognitiveChart.destroy();
 
@@ -606,14 +955,74 @@ buildTosRowView(tosRows: TopicEntry[]): any[] {
       data: {
         labels,
         datasets: [
-          { label: 'Correct', data: correct, backgroundColor: 'rgba(75, 192, 192, 0.7)' },
-          { label: 'Total', data: total, backgroundColor: 'rgba(255, 99, 132, 0.3)' },
+          { 
+            label: 'Correct', 
+            data: correct, 
+            backgroundColor: 'rgba(75, 192, 192, 0.7)',
+            borderColor: 'rgba(75, 192, 192, 1)',
+            borderWidth: 2,
+            borderRadius: 6
+          },
+          { 
+            label: 'Total', 
+            data: total, 
+            backgroundColor: 'rgba(255, 99, 132, 0.3)',
+            borderColor: 'rgba(255, 99, 132, 0.6)',
+            borderWidth: 2,
+            borderRadius: 6
+          },
         ],
       },
       options: {
-        responsive: true,
-        plugins: { title: { display: true, text: "Bloom's Cognitive Breakdown" } },
-        scales: { y: { beginAtZero: true } },
+        responsive: false,
+        devicePixelRatio: 1,
+        animation: {
+          duration: 500,
+          easing: 'easeOutQuart'
+        },
+        plugins: { 
+          title: { display: true, text: "Bloom's Cognitive Breakdown" },
+          tooltip: {
+            backgroundColor: 'rgba(0, 0, 0, 0.8)',
+            padding: 12,
+            titleFont: { size: 14 },
+            bodyFont: { size: 13 },
+            cornerRadius: 8
+          },
+          legend: {
+            position: 'top',
+            labels: {
+              font: { size: 11 },
+              usePointStyle: true,
+              padding: 15
+            }
+          }
+        },
+        scales: { 
+          y: { 
+            beginAtZero: true,
+            ticks: {
+              font: { size: 11 }
+            }
+          },
+          x: {
+            ticks: {
+              font: { size: 10 },
+              maxRotation: 45,
+              minRotation: 45
+            }
+          }
+        },
+        onClick: (event, elements) => {
+          if (elements.length > 0) {
+            const index = elements[0].index;
+            const datasetIndex = elements[0].datasetIndex;
+            const label = labels[index];
+            const value = datasetIndex === 0 ? correct[index] : total[index];
+            const type = datasetIndex === 0 ? 'Correct' : 'Total';
+            console.log(`${label} - ${type}: ${value}`);
+          }
+        }
       },
     });
   }
@@ -622,6 +1031,10 @@ buildTosRowView(tosRows: TopicEntry[]): any[] {
   renderCognitiveCombinedChart(answers: AnswerEntry[]) {
     const ctx = document.getElementById('cognitiveCombinedChart') as HTMLCanvasElement;
     if (!ctx) return;
+
+    // Set explicit dimensions
+    ctx.width = 300;
+    ctx.height = 200;
 
     if (this.cognitiveCombinedChart) this.cognitiveCombinedChart.destroy();
 
@@ -641,6 +1054,19 @@ buildTosRowView(tosRows: TopicEntry[]): any[] {
       return b.total > 0 ? Math.round((b.correct / b.total) * 100) : 0;
     });
 
+    // Color coding based on percentage
+    const backgroundColors = percents.map(p => {
+      if (p >= 70) return 'rgba(34, 197, 94, 0.7)'; // green
+      if (p >= 50) return 'rgba(234, 179, 8, 0.7)'; // yellow
+      return 'rgba(239, 68, 68, 0.7)'; // red
+    });
+
+    const borderColors = percents.map(p => {
+      if (p >= 70) return 'rgba(34, 197, 94, 1)';
+      if (p >= 50) return 'rgba(234, 179, 8, 1)';
+      return 'rgba(239, 68, 68, 1)';
+    });
+
     this.cognitiveCombinedChart = new Chart(ctx, {
       type: 'bar',
       data: {
@@ -649,17 +1075,67 @@ buildTosRowView(tosRows: TopicEntry[]): any[] {
           {
             label: '% Correct',
             data: percents,
-            backgroundColor: 'rgba(37, 99, 235, 0.7)'
+            backgroundColor: backgroundColors,
+            borderColor: borderColors,
+            borderWidth: 2,
+            borderRadius: 8
           }
         ]
       },
       options: {
-        responsive: true,
-        plugins: { title: { display: true, text: 'Cognitive Performance (% Correct)' } },
+        responsive: false,
+        devicePixelRatio: 1,
+        animation: {
+          duration: 600,
+          easing: 'easeOutQuart'
+        },
+        plugins: { 
+          title: { display: true, text: 'Cognitive Performance (% Correct)' },
+          tooltip: {
+            backgroundColor: 'rgba(0, 0, 0, 0.8)',
+            padding: 12,
+            titleFont: { size: 14 },
+            bodyFont: { size: 13 },
+            cornerRadius: 8,
+            callbacks: {
+              label: function(context) {
+                const value = context.parsed.y;
+                let status = 'Needs improvement';
+                if (value >= 70) status = 'Good';
+                else if (value >= 50) status = 'Average';
+                return `${value}% - ${status}`;
+              }
+            }
+          },
+          legend: {
+            display: false
+          }
+        },
         scales: {
           y: {
             beginAtZero: true,
-            max: 100
+            max: 100,
+            ticks: {
+              font: { size: 11 },
+              callback: function(value) {
+                return value + '%';
+              }
+            }
+          },
+          x: {
+            ticks: {
+              font: { size: 10 },
+              maxRotation: 45,
+              minRotation: 45
+            }
+          }
+        },
+        onClick: (event, elements) => {
+          if (elements.length > 0) {
+            const index = elements[0].index;
+            const label = labels[index];
+            const percent = percents[index];
+            console.log(`${label}: ${percent}% correct`);
           }
         }
       }
@@ -670,6 +1146,10 @@ buildTosRowView(tosRows: TopicEntry[]): any[] {
   renderTopicChart(answers: AnswerEntry[]) {
     const ctx = document.getElementById('topicChart') as HTMLCanvasElement;
     if (!ctx) return;
+
+    // Set explicit dimensions
+    ctx.width = 300;
+    ctx.height = 200;
 
     if (this.topicChart) this.topicChart.destroy();
 
@@ -692,14 +1172,74 @@ buildTosRowView(tosRows: TopicEntry[]): any[] {
       data: {
         labels,
         datasets: [
-          { label: 'Correct', data: correct, backgroundColor: 'rgba(153, 102, 255, 0.7)' },
-          { label: 'Total', data: total, backgroundColor: 'rgba(255, 206, 86, 0.3)' },
+          { 
+            label: 'Correct', 
+            data: correct, 
+            backgroundColor: 'rgba(153, 102, 255, 0.7)',
+            borderColor: 'rgba(153, 102, 255, 1)',
+            borderWidth: 2,
+            borderRadius: 6
+          },
+          { 
+            label: 'Total', 
+            data: total, 
+            backgroundColor: 'rgba(255, 206, 86, 0.3)',
+            borderColor: 'rgba(255, 206, 86, 0.6)',
+            borderWidth: 2,
+            borderRadius: 6
+          },
         ],
       },
       options: {
-        responsive: true,
-        plugins: { title: { display: true, text: 'Topic Breakdown' } },
-        scales: { y: { beginAtZero: true } },
+        responsive: false,
+        devicePixelRatio: 1,
+        animation: {
+          duration: 500,
+          easing: 'easeOutQuart'
+        },
+        plugins: { 
+          title: { display: true, text: 'Topic Breakdown' },
+          tooltip: {
+            backgroundColor: 'rgba(0, 0, 0, 0.8)',
+            padding: 12,
+            titleFont: { size: 14 },
+            bodyFont: { size: 13 },
+            cornerRadius: 8
+          },
+          legend: {
+            position: 'top',
+            labels: {
+              font: { size: 11 },
+              usePointStyle: true,
+              padding: 15
+            }
+          }
+        },
+        scales: { 
+          y: { 
+            beginAtZero: true,
+            ticks: {
+              font: { size: 11 }
+            }
+          },
+          x: {
+            ticks: {
+              font: { size: 10 },
+              maxRotation: 45,
+              minRotation: 45
+            }
+          }
+        },
+        onClick: (event, elements) => {
+          if (elements.length > 0) {
+            const index = elements[0].index;
+            const datasetIndex = elements[0].datasetIndex;
+            const label = labels[index];
+            const value = datasetIndex === 0 ? correct[index] : total[index];
+            const type = datasetIndex === 0 ? 'Correct' : 'Total';
+            console.log(`${label} - ${type}: ${value}`);
+          }
+        }
       },
     });
   }
@@ -708,6 +1248,10 @@ buildTosRowView(tosRows: TopicEntry[]): any[] {
   renderCompetencyChart(answers: AnswerEntry[]) {
     const ctx = document.getElementById('competencyChart') as HTMLCanvasElement;
     if (!ctx) return;
+
+    // Set explicit dimensions
+    ctx.width = 300;
+    ctx.height = 200;
 
     if (this.competencyChart) this.competencyChart.destroy();
 
@@ -730,14 +1274,74 @@ buildTosRowView(tosRows: TopicEntry[]): any[] {
       data: {
         labels,
         datasets: [
-          { label: 'Correct', data: correct, backgroundColor: 'rgba(255, 159, 64, 0.7)' },
-          { label: 'Total', data: total, backgroundColor: 'rgba(54, 162, 235, 0.3)' },
+          { 
+            label: 'Correct', 
+            data: correct, 
+            backgroundColor: 'rgba(255, 159, 64, 0.7)',
+            borderColor: 'rgba(255, 159, 64, 1)',
+            borderWidth: 2,
+            borderRadius: 6
+          },
+          { 
+            label: 'Total', 
+            data: total, 
+            backgroundColor: 'rgba(54, 162, 235, 0.3)',
+            borderColor: 'rgba(54, 162, 235, 0.6)',
+            borderWidth: 2,
+            borderRadius: 6
+          },
         ],
       },
       options: {
-        responsive: true,
-        plugins: { title: { display: true, text: 'Competency Breakdown' } },
-        scales: { y: { beginAtZero: true } },
+        responsive: false,
+        devicePixelRatio: 1,
+        animation: {
+          duration: 500,
+          easing: 'easeOutQuart'
+        },
+        plugins: { 
+          title: { display: true, text: 'Competency Breakdown' },
+          tooltip: {
+            backgroundColor: 'rgba(0, 0, 0, 0.8)',
+            padding: 12,
+            titleFont: { size: 14 },
+            bodyFont: { size: 13 },
+            cornerRadius: 8
+          },
+          legend: {
+            position: 'top',
+            labels: {
+              font: { size: 11 },
+              usePointStyle: true,
+              padding: 15
+            }
+          }
+        },
+        scales: { 
+          y: { 
+            beginAtZero: true,
+            ticks: {
+              font: { size: 11 }
+            }
+          },
+          x: {
+            ticks: {
+              font: { size: 10 },
+              maxRotation: 45,
+              minRotation: 45
+            }
+          }
+        },
+        onClick: (event, elements) => {
+          if (elements.length > 0) {
+            const index = elements[0].index;
+            const datasetIndex = elements[0].datasetIndex;
+            const label = labels[index];
+            const value = datasetIndex === 0 ? correct[index] : total[index];
+            const type = datasetIndex === 0 ? 'Correct' : 'Total';
+            console.log(`${label} - ${type}: ${value}`);
+          }
+        }
       },
     });
   }
@@ -755,15 +1359,16 @@ buildTosRowView(tosRows: TopicEntry[]): any[] {
 
     const breakdown = this.topicBreakdownData;
 
-    // TEMPORARILY DISABLED to debug hang issue
-    console.log('Per-topic charts temporarily disabled for debugging');
-    return;
     if (!breakdown.length) return;
 
     breakdown.forEach((topicData, index) => {
       const canvasId = `topicChart-${index}`;
       const ctx = document.getElementById(canvasId) as HTMLCanvasElement;
       if (!ctx) return;
+
+      // Set explicit dimensions
+      ctx.width = 280;
+      ctx.height = 150;
 
       const labels = topicData.cognitives.map(c => c.level);
       const correct = topicData.cognitives.map(c => c.correct);
@@ -774,19 +1379,68 @@ buildTosRowView(tosRows: TopicEntry[]): any[] {
         data: {
           labels,
           datasets: [
-            { label: 'Correct', data: correct, backgroundColor: 'rgba(75, 192, 192, 0.7)' },
-            { label: 'Total', data: total, backgroundColor: 'rgba(255, 159, 64, 0.3)' },
+            { 
+              label: 'Correct', 
+              data: correct, 
+              backgroundColor: 'rgba(75, 192, 192, 0.7)',
+              borderColor: 'rgba(75, 192, 192, 1)',
+              borderWidth: 2,
+              borderRadius: 4
+            },
+            { 
+              label: 'Total', 
+              data: total, 
+              backgroundColor: 'rgba(255, 159, 64, 0.3)',
+              borderColor: 'rgba(255, 159, 64, 0.6)',
+              borderWidth: 2,
+              borderRadius: 4
+            },
           ],
         },
         options: {
-          responsive: true,
+          responsive: false,
           maintainAspectRatio: false,
+          devicePixelRatio: 1,
+          animation: {
+            duration: 400,
+            easing: 'easeOutQuart'
+          },
           plugins: {
             title: { display: false },
-            legend: { display: false }
+            legend: { display: false },
+            tooltip: {
+              backgroundColor: 'rgba(0, 0, 0, 0.8)',
+              padding: 10,
+              titleFont: { size: 12 },
+              bodyFont: { size: 11 },
+              cornerRadius: 6
+            }
           },
           scales: {
-            y: { beginAtZero: true, ticks: { stepSize: 1 } }
+            y: { 
+              beginAtZero: true, 
+              ticks: { 
+                stepSize: 1,
+                font: { size: 10 }
+              }
+            },
+            x: {
+              ticks: {
+                font: { size: 9 },
+                maxRotation: 45,
+                minRotation: 45
+              }
+            }
+          },
+          onClick: (event, elements) => {
+            if (elements.length > 0) {
+              const index = elements[0].index;
+              const datasetIndex = elements[0].datasetIndex;
+              const label = labels[index];
+              const value = datasetIndex === 0 ? correct[index] : total[index];
+              const type = datasetIndex === 0 ? 'Correct' : 'Total';
+              console.log(`${topicData.topic} - ${label} - ${type}: ${value}`);
+            }
           }
         }
       });
@@ -797,5 +1451,110 @@ buildTosRowView(tosRows: TopicEntry[]): any[] {
 
   printPage() {
     window.print();
+  }
+
+  // Help modal methods
+  async showHelp(type: 'score' | 'cognitive' | 'topic' | 'statistics' | 'general') {
+    const helpContent = this.getHelpContent(type);
+    
+    const modal = await this.modalController.create({
+      component: HelpModalComponent,
+      componentProps: {
+        title: helpContent.title,
+        content: helpContent.content
+      },
+      cssClass: 'help-modal'
+    });
+    
+    await modal.present();
+  }
+
+  private getHelpContent(type: string) {
+    const contents = {
+      score: {
+        title: 'Understanding Your Score',
+        content: `
+          <p><strong>Score:</strong> Shows how many questions you answered correctly out of the total questions.</p>
+          <p><strong>Percentage:</strong> Your score converted to a percentage. Higher is better!</p>
+          <p><strong>Mean Percentage:</strong> The average score of all students who took this exam. Compare your score to see how you performed relative to the class.</p>
+        `
+      },
+      cognitive: {
+        title: 'Cognitive Levels Explained',
+        content: `
+          <p><strong>Bloom's Taxonomy:</strong> These charts show your performance across different thinking levels:</p>
+          <ul>
+            <li><strong>Remembering:</strong> Recalling facts and basic concepts</li>
+            <li><strong>Understanding:</strong> Explaining ideas or concepts</li>
+            <li><strong>Applying:</strong> Using information in new situations</li>
+            <li><strong>Analyzing:</strong> Drawing connections among ideas</li>
+            <li><strong>Evaluating:</strong> Justifying a stand or decision</li>
+            <li><strong>Creating:</strong> Producing new or original work</li>
+          </ul>
+          <p>The chart shows what percentage you got correct at each level.</p>
+        `
+      },
+      topic: {
+        title: 'Topic Breakdown Explained',
+        content: `
+          <p><strong>Topics:</strong> Shows which subject topics you performed well in and which need more practice.</p>
+          <p><strong>Good At:</strong> Topics where you scored 70% or higher - keep up the good work!</p>
+          <p><strong>Needs Improvement:</strong> Topics where you scored below 70% - focus your study time here.</p>
+          <p><strong>Per-Topic Charts:</strong> Each topic shows a breakdown of how you did at different cognitive levels within that topic.</p>
+        `
+      },
+      statistics: {
+        title: 'Answer Analysis Explained',
+        content: `
+          <p><strong>✅ Correct Answers:</strong> Number of questions the student answered correctly out of the total.</p>
+          <p><strong>❌ Incorrect Answers:</strong> Number of questions the student answered incorrectly.</p>
+          <p><strong>� Accuracy:</strong> The percentage of correct answers. Higher is better!</p>
+          <p><strong>🎯 Mean Percentage:</strong> The average score of all students who took this exam. Compare the student's accuracy to see how they performed relative to the class.</p>
+          <p><strong>� Answer Distribution:</strong> Shows which answer options (A, B, C, D) the student selected most frequently. This can reveal patterns in their answering behavior.</p>
+        `
+      },
+      general: {
+        title: 'Result Viewer Guide',
+        content: `
+          <p><strong>Details Tab:</strong> View your individual score, cognitive performance, topic breakdown, and scanned paper.</p>
+          <p><strong>Statistics Tab:</strong> View class-wide statistics to see how you compare to other students.</p>
+          <p><strong>Interactive Charts:</strong> Tap on any chart to see detailed values. Charts are color-coded for easy reading.</p>
+          <p><strong>Help Buttons:</strong> Tap the (?) icon next to any section for detailed explanations.</p>
+        `
+      }
+    };
+    
+    return (contents as any)[type] || contents.general;
+  }
+}
+
+// Help Modal Component
+@Component({
+  template: `
+    <ion-header>
+      <ion-toolbar>
+        <ion-title>{{ title }}</ion-title>
+        <ion-buttons slot="end">
+          <ion-button (click)="close()">
+            <ion-icon name="close"></ion-icon>
+          </ion-button>
+        </ion-buttons>
+      </ion-toolbar>
+    </ion-header>
+    <ion-content class="ion-padding">
+      <div [innerHTML]="content"></div>
+    </ion-content>
+  `,
+  standalone: true,
+  imports: [IonicModule, CommonModule]
+})
+export class HelpModalComponent {
+  title!: string;
+  content!: string;
+
+  constructor(private modalController: ModalController) {}
+
+  close() {
+    this.modalController.dismiss();
   }
 }

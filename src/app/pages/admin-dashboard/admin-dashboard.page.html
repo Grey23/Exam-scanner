@@ -28,7 +28,15 @@
   </div>
 
   <div class="dashboard-container">
-    <div *ngIf="!isLoading" class="stats-section">
+    <!-- Stats Section - Shows immediately -->
+    <div class="stats-section">
+      <!-- Loading skeletons for stats -->
+      <div *ngIf="isLoadingStats" class="stats-skeleton">
+        <div class="skeleton-card" *ngFor="let i of [0,1,2,3,4,5]"></div>
+      </div>
+      
+      <!-- Actual stats -->
+      <ng-container *ngIf="!isLoadingStats">
       <div class="stat-card users">
         <div class="stat-icon">
           <ion-icon name="people-circle-outline"></ion-icon>
@@ -88,19 +96,21 @@
           <p>Scanned Papers</p>
         </div>
       </div>
-    </div>
-
-    <div *ngIf="isLoading" class="loading-container">
-      <ion-spinner name="crescent"></ion-spinner>
-      <p>Loading dashboard...</p>
+    </ng-container>
     </div>
 
     <!-- Charts Section -->
-    <div class="charts-section" *ngIf="!isLoading">
+    <div class="charts-section">
       <div class="section-header">
         <h2>Analytics Overview</h2>
       </div>
       
+      <!-- Loading skeleton for charts -->
+      <div *ngIf="isLoadingCharts" class="charts-skeleton">
+        <div class="skeleton-chart" *ngFor="let i of [0,1,2,3]"></div>
+      </div>
+      
+      <!-- Actual charts -->
       <div class="charts-grid">
         <!-- Users Breakdown Chart -->
         <ion-card class="chart-card">

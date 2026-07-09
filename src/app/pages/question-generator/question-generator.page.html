@@ -64,6 +64,39 @@
       </ion-card-content>
     </ion-card>
 
+    <ion-card class="pdf-confirmation-card" *ngIf="showPdfConfirmation && pendingPdfFile">
+      <ion-card-header>
+        <ion-card-title>Confirm lesson file</ion-card-title>
+        <ion-card-subtitle>Are you sure this is the correct file that matches the TOS for this subject?</ion-card-subtitle>
+      </ion-card-header>
+      <ion-card-content>
+        <div class="pdf-preview">
+          <ion-icon name="document-outline" class="pdf-preview-icon"></ion-icon>
+          <div class="pdf-preview-details">
+            <div class="pdf-preview-name">{{ pendingPdfFileName }}</div>
+            <div class="pdf-preview-meta">{{ pendingPdfFileSize }}</div>
+          </div>
+        </div>
+
+        <div class="pdf-confirm-message">
+          This file should match the current TOS topics and competencies for the selected subject.
+          Confirm only if this PDF is the correct lesson material used to generate questions from your TOS.
+        </div>
+
+        <div class="pdf-confirm-actions">
+          <ion-button color="primary" (click)="confirmPendingPdfSelection()">
+            Yes, use this file
+          </ion-button>
+          <ion-button fill="outline" color="medium" (click)="chooseAnotherPdfFile()">
+            Upload another file
+          </ion-button>
+          <ion-button fill="clear" color="danger" (click)="cancelPendingPdfSelection()">
+            Cancel
+          </ion-button>
+        </div>
+      </ion-card-content>
+    </ion-card>
+
     <div class="question-list">
       <ion-card class="question-card" *ngFor="let q of displayQuestions; let i = index">
         <ion-card-content>

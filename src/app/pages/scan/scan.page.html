@@ -101,7 +101,13 @@
     <!-- Scanned Sheet Preview (what the scanner actually used) -->
     <div class="scan-preview" *ngIf="scannedPreviewImage">
       <h3 class="section-title">Scanned Sheet Preview</h3>
-      <p class="section-subtitle">This is the image used for grading. The circles show where bubbles were read.</p>
+      <p class="section-subtitle">This is the image used for grading. Colored rings show detected answers.</p>
+
+      <div class="scan-overlay-legend">
+        <span class="legend-item legend-correct"><i></i> Correct</span>
+        <span class="legend-item legend-wrong"><i></i> Wrong</span>
+        <span class="legend-item legend-blank"><i></i> Blank</span>
+      </div>
 
       <div class="scan-preview-frame">
         <img

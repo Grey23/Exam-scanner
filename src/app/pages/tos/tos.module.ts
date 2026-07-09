@@ -5,7 +5,6 @@ import { FormsModule } from '@angular/forms';
 import { IonicModule } from '@ionic/angular';
 
 import { TosPageRoutingModule } from './tos-routing.module';
-import { RouterModule } from '@angular/router';
 import { TosPage } from './tos.page';
 
 @NgModule({
@@ -14,7 +13,6 @@ import { TosPage } from './tos.page';
     FormsModule,
     IonicModule,
     TosPageRoutingModule,
-    RouterModule.forChild([{ path: '', component: TosPage }]),
     TosPage
   ]
 })

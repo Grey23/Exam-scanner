@@ -16,74 +16,30 @@
 
       <!-- Icon Section -->
       <div class="icon-section">
-        <div class="icon-wrapper">
-          <ion-icon name="person-add-outline"></ion-icon>
+        <div class="icon-wrapper admin-icon">
+          <ion-icon name="shield-checkmark-outline"></ion-icon>
         </div>
       </div>
 
       <!-- Header -->
       <div class="form-header">
-        <h2>Create Account</h2>
-        <p>Join us and get started today</p>
+        <h2>Admin Registration</h2>
+        <p>Create an administrator account</p>
       </div>
 
       <form (ngSubmit)="register()" class="register-form">
-        <!-- Teacher Registration Only -->
+        <!-- Admin Badge -->
         <div class="user-type-section">
           <div class="input-label">
-            <ion-icon name="person-outline"></ion-icon>
-            <span>Teacher Registration</span>
+            <ion-icon name="shield-outline"></ion-icon>
+            <span>Administrator Account</span>
           </div>
         </div>
 
-        <!-- Teacher ID Field - First -->
-        <div class="input-group">
-          <div class="input-label">
-            <ion-icon name="id-card-outline"></ion-icon>
-            <span>Teacher ID</span>
-          </div>
-          <div class="input-wrapper">
-            <ion-input
-              type="text"
-              [(ngModel)]="teacherId"
-              name="teacherId"
-              placeholder="Enter your Teacher ID"
-              (ionBlur)="validateTeacherId()"
-              [disabled]="isLoading || validatingTeacherId"
-            ></ion-input>
-            <ion-button
-              fill="clear"
-              (click)="validateTeacherId()"
-              class="validate-btn"
-              type="button"
-              [disabled]="!teacherId.trim() || validatingTeacherId"
-            >
-              <ion-spinner *ngIf="validatingTeacherId" name="crescent"></ion-spinner>
-              <ion-icon *ngIf="!validatingTeacherId" name="checkmark-circle-outline"></ion-icon>
-            </ion-button>
-          </div>
-          <div class="validation-message" *ngIf="teacherIdMessage">
-            <ion-icon
-              [name]="teacherIdValid ? 'checkmark-circle' : 'close-circle'"
-              [class.valid]="teacherIdValid"
-              [class.invalid]="!teacherIdValid"
-            ></ion-icon>
-            <span [class.valid]="teacherIdValid" [class.invalid]="!teacherIdValid">
-              {{ teacherIdMessage }}
-            </span>
-          </div>
-          <div class="verified-name" *ngIf="verifiedTeacherName && teacherIdValid">
-            <ion-icon name="person-outline"></ion-icon>
-            <span>Verified: {{ verifiedTeacherName }}</span>
-          </div>
-        </div>
-
-        <!-- Full Name - Auto-filled from Teacher ID -->
         <div class="input-group">
           <div class="input-label">
             <ion-icon name="person-outline"></ion-icon>
             <span>Full Name</span>
-            <ion-icon *ngIf="teacherIdValid && name" name="checkmark-circle" class="auto-fill-icon"></ion-icon>
           </div>
           <div class="input-wrapper">
             <ion-input
@@ -91,6 +47,22 @@
               [(ngModel)]="name"
               name="name"
               placeholder="Enter your full name"
+              required
+            ></ion-input>
+          </div>
+        </div>
+
+        <div class="input-group">
+          <div class="input-label">
+            <ion-icon name="school-outline"></ion-icon>
+            <span>School Name</span>
+          </div>
+          <div class="input-wrapper">
+            <ion-input
+              type="text"
+              [(ngModel)]="schoolName"
+              name="schoolName"
+              placeholder="Enter school name"
               required
             ></ion-input>
           </div>
@@ -150,11 +122,11 @@
           </div>
         </div>
 
-        <ion-button expand="block" type="submit" class="submit-btn" [disabled]="isLoading">
+        <ion-button expand="block" type="submit" class="submit-btn admin-submit" [disabled]="isLoading">
           <ion-spinner *ngIf="isLoading" name="crescent"></ion-spinner>
           <span *ngIf="!isLoading">
-            <ion-icon name="checkmark-circle-outline"></ion-icon>
-            Create Account
+            <ion-icon name="shield-checkmark-outline"></ion-icon>
+            Create Admin Account
           </span>
         </ion-button>
       </form>

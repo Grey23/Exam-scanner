@@ -15,8 +15,7 @@ import { TeacherService } from './services/teacher.service';
   selector: 'app-root',
   templateUrl: 'app.component.html',
   styleUrls: ['app.component.scss'],
-  imports: [CommonModule, IonicModule, FormsModule, RouterModule],
-  standalone: true,
+  standalone: false,
 })
 export class AppComponent {
     @Input() activePage: 'dashboard' | 'classes' | 'subjects' | 'scan' | 'results' | 'settings' | '' = '';
@@ -99,6 +98,11 @@ export class AppComponent {
   }
 
   async loadProfilePhoto() {
+    const user = this.authService.getCurrentUser();
+    if (!user) {
+      this.profilePhotoUrl = null;
+      return;
+    }
     try {
       const result = await this.teacherService.getMyProfile();
       if (result.success && result.profile?.photoURL) {

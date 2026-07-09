@@ -114,8 +114,7 @@ export class TeacherService {
     const user = JSON.parse(userData.value || '{}');
     let teacherId = String(user?.id || '').trim();
     if (!teacherId) {
-      teacherId = 'dev-teacher';
-      console.warn('[TeacherService] No logged-in user; using fallback teacherId:', teacherId);
+      throw new Error('[TeacherService] No logged-in user. Cannot get teacher ID.');
     }
     this.teacherIdCache = teacherId;
     return teacherId;

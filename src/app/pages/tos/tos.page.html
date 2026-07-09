@@ -50,7 +50,10 @@
   </ion-card>
 
   <!-- Mode Switch Buttons -->
-  <ion-segment [(ngModel)]="viewMode" (ionChange)="onModeChange(viewMode)" class="mode-segment">
+  <ion-segment #modeSegment [(ngModel)]="viewMode" (ionChange)="onModeChange(viewMode)" class="mode-segment">
+    <ion-segment-button value="overview">
+      <ion-label>Overview</ion-label>
+    </ion-segment-button>
     <ion-segment-button value="edit">
       <ion-label>Edit</ion-label>
     </ion-segment-button>
@@ -60,16 +63,140 @@
     <ion-segment-button value="students">
       <ion-label>Students</ion-label>
     </ion-segment-button>
+    <ion-segment-button value="responses">
+      <ion-label>Responses</ion-label>
+    </ion-segment-button>
     <ion-segment-button value="print">
       <ion-label>Print</ion-label>
     </ion-segment-button>
   </ion-segment>
 
+  <!-- Overview Tab: Student Participation & Cognitive Performance Dashboard -->
+  <div *ngIf="viewMode === 'overview'">
+    <ion-card class="participation-card">
+      <ion-card-header>
+        <ion-card-title class="dashboard-title">Student Overview</ion-card-title>
+      </ion-card-header>
+      <ion-card-content>
+        <!-- Participation Metrics -->
+        <div class="participation-metrics">
+          <div class="metric-box scanned" (click)="showStudentList('scanned')" style="cursor: pointer;">
+            <div class="metric-label">Scanned</div>
+            <div class="metric-value">{{ studentsScanned }} / {{ totalStudents }}</div>
+            <div class="metric-percent" *ngIf="totalStudents > 0">
+              {{ totalStudents > 0 ? ((studentsScanned / totalStudents) * 100).toFixed(0) : 0 }}%
+            </div>
+            <div style="font-size: 11px; opacity: 0.7; margin-top: 6px;">Click to view</div>
+          </div>
+          <div class="metric-box not-scanned" (click)="showStudentList('notScanned')" style="cursor: pointer;">
+            <div class="metric-label">Not Scanned</div>
+            <div class="metric-value">{{ studentsNotScanned }}</div>
+            <div class="metric-percent" *ngIf="totalStudents > 0">
+              {{ totalStudents > 0 ? ((studentsNotScanned / totalStudents) * 100).toFixed(0) : 0 }}%
+            </div>
+            <div style="font-size: 11px; opacity: 0.7; margin-top: 6px;">Click to view</div>
+          </div>
+        </div>
+
+        <!-- Performance Categories -->
+        <div class="performance-categories" *ngIf="studentsScanned > 0">
+          <div class="category-label">Performance Distribution</div>
+          <div class="category-boxes">
+            <div class="category-box good" (click)="showStudentList('good')" style="cursor: pointer;">
+              <div class="category-name">Good (≥75%)</div>
+              <div class="category-count">{{ studentsPerformanceGood }}</div>
+              <div style="font-size: 10px; opacity: 0.7; margin-top: 6px;">Click to view</div>
+            </div>
+            <div class="category-box average" (click)="showStudentList('average')" style="cursor: pointer;">
+              <div class="category-name">Average (50-75%)</div>
+              <div class="category-count">{{ studentsPerformanceAverage }}</div>
+              <div style="font-size: 10px; opacity: 0.7; margin-top: 6px;">Click to view</div>
+            </div>
+            <div class="category-box struggling" (click)="showStudentList('struggling')" style="cursor: pointer;">
+              <div class="category-name">Struggling (<50%)</div>
+              <div class="category-count">{{ studentsPerformanceStruggling }}</div>
+              <div style="font-size: 10px; opacity: 0.7; margin-top: 6px;">Click to view</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Cognitive Level Breakdown -->
+        <div class="cognitive-breakdown" *ngIf="studentsScanned > 0">
+          <div class="cognitive-label">Cognitive Performance by Bloom's Level</div>
+          <div class="cognitive-bars">
+            <div class="cognitive-bar" *ngFor="let level of ['Remember (R)', 'Understand (U)', 'Apply (A)', 'Analyze (A)', 'Evaluate (E)', 'Create (C)']">
+              <div class="bar-label">{{ level }}</div>
+              <div class="bar-container">
+                <div class="bar-fill" 
+                     [style.width.%]="studentsCognitiveBreakdown[level]?.percent || 0"
+                     [ngClass]="'color-' + getCognitivePerformanceColor(studentsCognitiveBreakdown[level]?.percent || 0)">
+                </div>
+              </div>
+              <div class="bar-value">
+                {{ studentsCognitiveBreakdown[level]?.correct || 0 }}/{{ studentsCognitiveBreakdown[level]?.total || 0 }}
+                ({{ (studentsCognitiveBreakdown[level]?.percent || 0).toFixed(1) }}%)
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Not Scanned Students -->
+        <div class="not-scanned-students" *ngIf="getNotScannedStudents().length > 0">
+          <div class="not-scanned-label">Students Not Yet Scanned ({{ getNotScannedStudents().length }})</div>
+          <div class="not-scanned-list">
+            <div class="student-tag" *ngFor="let student of getNotScannedStudents()">
+              {{ student.name }} <span class="roll-number" *ngIf="student.roll_number">#{{ student.roll_number }}</span>
+            </div>
+          </div>
+        </div>
+      </ion-card-content>
+    </ion-card>
+  </div>
+
+  <!-- Responses Tab -->
+  <div *ngIf="viewMode === 'responses'">
+    <ion-card class="participation-card">
+      <ion-card-header>
+        <ion-card-title class="dashboard-title">Student Responses</ion-card-title>
+      </ion-card-header>
+      <ion-card-content>
+        <p class="response-help-text">Each question shows the correct answer and the students who chose A, B, C, or D.</p>
+
+        <div class="response-list" *ngFor="let item of questionResponseBreakdown">
+          <div class="response-question-card">
+            <div class="response-question-title">Question {{ item.question }}</div>
+            <div class="response-correct-answer">Correct answer: {{ item.correctAnswer || '—' }}</div>
+
+            <div class="response-group" *ngFor="let option of responseOptions">
+              <div class="response-option-row" (click)="showResponseOptionList(item, option)" style="cursor: pointer;">
+                <span class="response-option-label">{{ option }}</span>
+                <div class="response-student-list">
+                  <span class="response-preview-text">
+                    {{ getOptionResponseLabel(item, option) }}
+                  </span>
+                </div>
+                <span class="response-count-badge">{{ getOptionResponses(item, option).length }}</span>
+                <ion-icon name="chevron-forward-outline" slot="end" style="font-size: 16px; opacity: 0.35;"></ion-icon>
+              </div>
+            </div>
+          </div>
+        </div>
+      </ion-card-content>
+    </ion-card>
+  </div>
+
   <!-- Edit Mode -->
   <div *ngIf="viewMode === 'edit'">
     <div class="section-header">
-      <div class="section-title">Edit TOS</div>
-      <div class="section-subtitle">Add topics and distribute items across Bloom's levels</div>
+      <div style="display: flex; align-items: center; gap: 8px; justify-content: space-between;">
+        <div>
+          <div class="section-title">Edit TOS</div>
+          <div class="section-subtitle">Create your exam blueprint</div>
+        </div>
+        <ion-button fill="clear" size="small" (click)="showHelp('overview')">
+          <ion-icon name="help-circle"></ion-icon>
+        </ion-button>
+      </div>
     </div>
 
     <ion-button expand="block" (click)="addTopicRow()" class="add-topic-btn">
@@ -120,33 +247,63 @@
         </ion-card-header>
         <ion-card-content *ngIf="isTopicExpanded(i)">
           <ion-item lines="none">
-            <ion-label position="stacked">Topic Name</ion-label>
+            <ion-label position="stacked">
+              <span>Topic Name</span>
+              <ion-button fill="clear" size="small" (click)="showHelp('topicName')" style="float: right; margin-top: -5px;">
+                <ion-icon name="help-circle-outline" style="font-size: 16px; color: #2563eb;"></ion-icon>
+              </ion-button>
+            </ion-label>
             <ion-input [(ngModel)]="row.topicName" placeholder="e.g. Photosynthesis"></ion-input>
           </ion-item>
 
           <ion-item lines="none">
-            <ion-label position="stacked">Learning Competency</ion-label>
+            <ion-label position="stacked">
+              <span>Learning Competency</span>
+              <ion-button fill="clear" size="small" (click)="showHelp('competency')" style="float: right; margin-top: -5px;">
+                <ion-icon name="help-circle-outline" style="font-size: 16px; color: #2563eb;"></ion-icon>
+              </ion-button>
+            </ion-label>
             <ion-input [(ngModel)]="row.learningCompetency" placeholder="What students should learn"></ion-input>
           </ion-item>
 
           <div class="tos-meta-grid">
             <ion-item lines="none">
-              <ion-label position="stacked">No. of Days</ion-label>
+              <ion-label position="stacked">
+                <span>No. of Days</span>
+                <ion-button fill="clear" size="small" (click)="showHelp('days')" style="float: right; margin-top: -5px;">
+                  <ion-icon name="help-circle-outline" style="font-size: 14px; color: #2563eb;"></ion-icon>
+                </ion-button>
+              </ion-label>
               <ion-input [(ngModel)]="row.days" type="number" inputmode="numeric" placeholder="0"></ion-input>
             </ion-item>
 
             <ion-item lines="none">
-              <ion-label position="stacked">Percent (%)</ion-label>
+              <ion-label position="stacked">
+                <span>Percent (%)</span>
+                <ion-button fill="clear" size="small" (click)="showHelp('percent')" style="float: right; margin-top: -5px;">
+                  <ion-icon name="help-circle-outline" style="font-size: 14px; color: #2563eb;"></ion-icon>
+                </ion-button>
+              </ion-label>
               <ion-input [(ngModel)]="row.percent" type="number" inputmode="numeric" placeholder="0"></ion-input>
             </ion-item>
 
             <ion-item lines="none">
-              <ion-label position="stacked">Planned Items</ion-label>
+              <ion-label position="stacked">
+                <span>Planned Items</span>
+                <ion-button fill="clear" size="small" (click)="showHelp('plannedItems')" style="float: right; margin-top: -5px;">
+                  <ion-icon name="help-circle-outline" style="font-size: 14px; color: #2563eb;"></ion-icon>
+                </ion-button>
+              </ion-label>
               <ion-input [(ngModel)]="row.expectedItems" type="number" inputmode="numeric" placeholder="0"></ion-input>
             </ion-item>
           </div>
 
-          <div class="tos-bloom-title">Bloom’s Levels (Number of Items)</div>
+          <div class="tos-bloom-title">
+            <span>Bloom's Levels (Number of Items)</span>
+            <ion-button fill="clear" size="small" (click)="showHelp('blooms')" style="float: right; margin-top: -5px;">
+              <ion-icon name="help-circle-outline" style="font-size: 16px; color: #2563eb;"></ion-icon>
+            </ion-button>
+          </div>
           <div class="tos-bloom-grid">
             <ion-item lines="none">
               <ion-label position="stacked">Remembering</ion-label>

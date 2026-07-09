@@ -19,6 +19,10 @@ const routes: Routes = [
     loadChildren: () => import('./pages/register/register.module').then(m => m.RegisterPageModule)
   },
   {
+    path: 'x7k9m2-admin',
+    loadChildren: () => import('./pages/admin-register/admin-register.module').then(m => m.AdminRegisterPageModule)
+  },
+  {
     path: 'forgot-password',
     loadComponent: () => import('./pages/forgot-password/forgot-password.page').then(m => m.ForgotPasswordPage)
   },

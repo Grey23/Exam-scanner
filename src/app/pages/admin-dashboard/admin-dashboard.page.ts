@@ -28,6 +28,9 @@ interface QuestionsByDay {
 export class AdminDashboardPage implements OnInit {
   currentUser: User | null = null;
   isLoading = false;
+  isLoadingStats = false;
+  isLoadingCharts = false;
+  private hasLoadedOnce = false;
 
   totalUsers = 0;
   totalTeachers = 0;
@@ -58,31 +61,42 @@ export class AdminDashboardPage implements OnInit {
   }
 
   ngOnInit() {
+    // Defer initial load to ionViewDidEnter so canvases exist before rendering Chart.js
+  }
+
+  ionViewDidEnter() {
+    if (this.hasLoadedOnce) return;
+    this.hasLoadedOnce = true;
     void this.loadData();
   }
 
   async loadData() {
-    this.isLoading = true;
+    // Load stats first (fast)
+    this.isLoadingStats = true;
+    this.isLoadingCharts = true;
+    
     try {
       const res = await this.adminService.getDashboardMetrics();
       if (!res.success || !res.data) {
         throw new Error(res.message || 'Failed to load dashboard metrics');
       }
 
+      // Set stats immediately
       this.totalUsers = Number(res.data.totalUsers || 0);
       this.totalTeachers = Number(res.data.totalTeachers || 0);
       this.totalAdmins = Number(res.data.totalAdmins || 0);
-
       this.totalClasses = Number(res.data.totalClasses || 0);
       this.questionsGeneratedToday = Number(res.data.questionsGeneratedToday || 0);
       this.totalScannedPapers = Number(res.data.totalScannedPapers || 0);
+      this.isLoadingStats = false;
 
       // Get real chart data from backend
       this.weeklyActivity = Array.isArray(res.data.weeklyActivity) ? res.data.weeklyActivity : [];
       this.scansByClass = Array.isArray(res.data.scansByClass) ? res.data.scansByClass : [];
       this.questionsByDay = Array.isArray(res.data.questionsByDay) ? res.data.questionsByDay : [];
 
-      this.renderAllCharts();
+      // Defer chart rendering
+      setTimeout(() => this.renderChartsLazy(), 0);
     } catch (err) {
       console.error('AdminDashboardPage: loadData failed:', err);
       const msg = err instanceof Error ? err.message : 'Failed to load dashboard metrics';
@@ -93,18 +107,30 @@ export class AdminDashboardPage implements OnInit {
       this.totalClasses = 0;
       this.questionsGeneratedToday = 0;
       this.totalScannedPapers = 0;
-    } finally {
-      this.isLoading = false;
+      this.isLoadingStats = false;
+      this.isLoadingCharts = false;
     }
   }
 
-  private renderAllCharts(): void {
-    setTimeout(() => {
+  private renderChartsLazy(): void {
+    // Use requestAnimationFrame for smoother rendering
+    requestAnimationFrame(() => {
+      // Render charts in sequence with micro-delays to not block UI
       this.renderUsersChart();
-      this.renderActivityChart();
-      this.renderScansChart();
-      this.renderQuestionsChart();
-    }, 100);
+      
+      setTimeout(() => {
+        this.renderActivityChart();
+        
+        setTimeout(() => {
+          this.renderScansChart();
+          
+          setTimeout(() => {
+            this.renderQuestionsChart();
+            this.isLoadingCharts = false;
+          }, 50);
+        }, 50);
+      }, 50);
+    });
   }
 
   private renderUsersChart(): void {

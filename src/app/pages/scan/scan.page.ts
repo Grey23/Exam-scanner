@@ -120,9 +120,6 @@ export class ScanPage implements AfterViewInit, OnDestroy {
 
     if (!overlay.width || !overlay.height) return;
 
-    // Determine the coordinate base size for bubble-template.
-    // - Warped OpenCV preview is exactly 800x1131 -> perfect alignment.
-    // - Otherwise, fall back to the image's natural dimensions (may be cropped/offset).
     const baseW = this.lastPreviewWasWarped ? this.SHEET_WIDTH : (imgEl?.naturalWidth || this.SHEET_WIDTH);
     const baseH = this.lastPreviewWasWarped ? this.SHEET_HEIGHT : (imgEl?.naturalHeight || this.SHEET_HEIGHT);
 
@@ -142,64 +139,87 @@ export class ScanPage implements AfterViewInit, OnDestroy {
       1
     );
 
-    // Draw bubble template for each question (outline) and fill the detected/correct answers.
+    type RingStyle = 'correct' | 'wrong' | 'correctKey' | 'blank' | 'invalid';
+
+    const drawBubbleRing = (tpl: typeof bubbles[0], opt: 'A' | 'B' | 'C' | 'D', style: RingStyle) => {
+      const coord = tpl.options[opt];
+      const x = coord.cx * scaleX;
+      const y = coord.cy * scaleY;
+      const r = coord.radius * scaleR;
+
+      ctx.save();
+      ctx.setLineDash([]);
+
+      switch (style) {
+        case 'correct':
+          ctx.strokeStyle = '#22c55e';
+          ctx.lineWidth = Math.max(3, 4 * scaleR);
+          break;
+        case 'wrong':
+          ctx.strokeStyle = '#ef4444';
+          ctx.lineWidth = Math.max(3, 4 * scaleR);
+          break;
+        case 'correctKey':
+          ctx.strokeStyle = '#16a34a';
+          ctx.lineWidth = Math.max(2.5, 3 * scaleR);
+          break;
+        case 'blank':
+          ctx.strokeStyle = '#f59e0b';
+          ctx.lineWidth = Math.max(2.5, 3 * scaleR);
+          ctx.setLineDash([5, 4]);
+          break;
+        case 'invalid':
+          ctx.strokeStyle = '#a855f7';
+          ctx.lineWidth = Math.max(2.5, 3 * scaleR);
+          break;
+      }
+
+      ctx.beginPath();
+      ctx.arc(x, y, r + 2 * scaleR, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.restore();
+    };
+
     for (let q = 1; q <= Math.min(50, maxQuestion); q++) {
       const tpl = bubbles[q - 1];
       if (!tpl) continue;
 
       const res = byQuestion.get(q);
-      const detected = res?.detectedAnswer;
-      const correct = res?.correctAnswer;
-
-      // Outline bubble
-      const drawBubble = (opt: 'A' | 'B' | 'C' | 'D', fill?: { color: string; alpha: number }) => {
-        const coord = tpl.options[opt];
-        const x = coord.cx * scaleX;
-        const y = coord.cy * scaleY;
-        const r = coord.radius * scaleR;
-
-        ctx.beginPath();
-        ctx.arc(x, y, r, 0, Math.PI * 2);
-        ctx.fillStyle = 'transparent';
-        ctx.strokeStyle = 'rgba(17,24,39,0.35)';
-        ctx.lineWidth = 2;
-
-        ctx.stroke();
-
-        if (fill) {
-          ctx.save();
-          ctx.globalAlpha = fill.alpha;
-          ctx.fillStyle = fill.color;
-          ctx.fill();
-          ctx.restore();
-        }
-      };
-
-      // Always show outlines for all options
-      drawBubble('A');
-      drawBubble('B');
-      drawBubble('C');
-      drawBubble('D');
-
       if (!res) continue;
 
-      if (detected && ['A', 'B', 'C', 'D'].includes(detected)) {
-        const detectedColor =
-          res.status === 'Correct'
-            ? 'rgba(16,185,129,1)' // green
-            : res.status === 'Incorrect'
-              ? 'rgba(239,68,68,1)' // red
-              : res.status === 'Blank'
-                ? 'rgba(59,130,246,1)' // blue
-                : 'rgba(245,158,11,1)'; // amber/orange
+      const detected = res.detectedAnswer && ['A', 'B', 'C', 'D'].includes(res.detectedAnswer)
+        ? res.detectedAnswer as 'A' | 'B' | 'C' | 'D'
+        : null;
+      const correct = res.correctAnswer && ['A', 'B', 'C', 'D'].includes(res.correctAnswer)
+        ? res.correctAnswer as 'A' | 'B' | 'C' | 'D'
+        : null;
 
-        drawBubble(detected as any, { color: detectedColor, alpha: 0.35 });
+      if (res.status === 'Blank') {
+        for (const opt of ['A', 'B', 'C', 'D'] as const) {
+          drawBubbleRing(tpl, opt, 'blank');
+        }
+        continue;
       }
 
-      if (res.status === 'Incorrect' && correct && ['A', 'B', 'C', 'D'].includes(correct) && correct !== detected) {
-        drawBubble(correct as any, { color: 'rgba(59,130,246,1)', alpha: 0.25 });
+      if (res.status === 'Correct' && detected) {
+        drawBubbleRing(tpl, detected, 'correct');
+        continue;
+      }
+
+      if (res.status === 'Incorrect') {
+        if (detected) drawBubbleRing(tpl, detected, 'wrong');
+        if (correct && correct !== detected) drawBubbleRing(tpl, correct, 'correctKey');
+        continue;
+      }
+
+      if (res.status === 'Invalid') {
+        if (detected) drawBubbleRing(tpl, detected, 'invalid');
       }
     }
+  }
+
+  private scheduleScanOverlayRender() {
+    setTimeout(() => this.renderScanOverlay(), 50);
   }
 
   private getTrackedCornerHints(): CornerHints | null {
@@ -473,6 +493,7 @@ export class ScanPage implements AfterViewInit, OnDestroy {
         this.showResults = true;
         this.isProcessing = false;
         this.statusMessage = 'Ready to scan';
+        this.scheduleScanOverlayRender();
         void this.loadStudentsForSave().then(() => {
           // Prefer explicit QR student id if available, otherwise fallback hash
           if (qrStudentId != null) {
@@ -555,6 +576,7 @@ export class ScanPage implements AfterViewInit, OnDestroy {
                 this.showResults = true;
                 this.isProcessing = false;
                 this.statusMessage = 'Ready to scan';
+                this.scheduleScanOverlayRender();
                 void this.loadStudentsForSave().then(() => {
                   if (qrStudentId != null) {
                     this.autoAttachByExactId(qrStudentId as number);
@@ -609,6 +631,7 @@ export class ScanPage implements AfterViewInit, OnDestroy {
     }
     
     this.calculateStats();
+    this.scheduleScanOverlayRender();
   }
 
   // Remove the old OpenCV based methods as they are no longer used

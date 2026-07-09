@@ -3,6 +3,18 @@ const router = express.Router();
 const pool = require('../config/database');
 const { verifyToken } = require('../middleware/auth');
 
+// Per-teacher cache for dashboard metrics (2 minutes TTL)
+const teacherDashboardCache = new Map(); // teacherId -> { data, timestamp }
+
+// Per-teacher cache for classes list (2 minutes TTL)
+const teacherClassesCache = new Map(); // teacherId -> { data, timestamp }
+
+// Helper to invalidate teacher cache when data changes
+function invalidateTeacherCache(teacherId) {
+  teacherDashboardCache.delete(String(teacherId));
+  teacherClassesCache.delete(String(teacherId));
+}
+
 router.get('/ping', (req, res) => {
   res.json({ success: true, message: 'teacher routes ok' });
 
@@ -55,6 +67,9 @@ router.post('/classes/:classId/students', verifyToken, async (req, res) => {
 
     connection.release();
 
+    // Invalidate cache since data changed
+    invalidateTeacherCache(teacherId);
+
     res.json({
       success: true,
       student: newStudent,
@@ -99,6 +114,10 @@ router.delete('/classes/:classId/students/:studentId', verifyToken, async (req, 
     await connection.query('DELETE FROM students WHERE id = ?', [studentId]);
 
     connection.release();
+
+    // Invalidate cache since data changed
+    invalidateTeacherCache(teacherId);
+
     res.json({ success: true, message: 'Student deleted successfully' });
   } catch (err) {
     console.error('Error deleting student:', err);
@@ -295,6 +314,20 @@ router.get('/dashboard', verifyToken, async (req, res) => {
     }
 
     const teacherId = req.user.id;
+    const CACHE_TTL_MS = 120000; // 2 minutes
+
+    // Check cache first
+    const cached = teacherDashboardCache.get(String(teacherId));
+    const now = Date.now();
+    if (cached && (now - cached.timestamp) < CACHE_TTL_MS) {
+      return res.json({
+        success: true,
+        data: cached.data,
+        cached: true,
+        responseTimeMs: now - cached.timestamp
+      });
+    }
+
     const connection = await pool.getConnection();
 
     // Get teacher's classes
@@ -361,17 +394,26 @@ router.get('/dashboard', verifyToken, async (req, res) => {
 
     connection.release();
 
+    const responseData = {
+      totalClasses: classes.length,
+      totalStudents: studentCount[0].total_students || 0,
+      totalSubjects: subjectCount[0].total_subjects || 0,
+      averageScore: avgScore[0].average_score || 0,
+      classes,
+      recentExams,
+      classPerformance
+    };
+
+    // Update cache
+    teacherDashboardCache.set(String(teacherId), {
+      data: responseData,
+      timestamp: Date.now()
+    });
+
     res.json({
       success: true,
-      data: {
-        totalClasses: classes.length,
-        totalStudents: studentCount[0].total_students || 0,
-        totalSubjects: subjectCount[0].total_subjects || 0,
-        averageScore: avgScore[0].average_score || 0,
-        classes,
-        recentExams,
-        classPerformance
-      }
+      data: responseData,
+      cached: false
     });
 
   } catch (err) {
@@ -384,6 +426,19 @@ router.get('/dashboard', verifyToken, async (req, res) => {
 router.get('/classes', verifyToken, async (req, res) => {
   try {
     const teacherId = req.user.id;
+    const CACHE_TTL_MS = 120000; // 2 minutes
+
+    // Check cache first
+    const cached = teacherClassesCache.get(String(teacherId));
+    const now = Date.now();
+    if (cached && (now - cached.timestamp) < CACHE_TTL_MS) {
+      return res.json({
+        success: true,
+        classes: cached.data,
+        cached: true
+      });
+    }
+
     const connection = await pool.getConnection();
 
     const [classes] = await connection.query(
@@ -397,9 +452,16 @@ router.get('/classes', verifyToken, async (req, res) => {
 
     connection.release();
 
+    // Update cache
+    teacherClassesCache.set(String(teacherId), {
+      data: classes,
+      timestamp: Date.now()
+    });
+
     res.json({
       success: true,
-      classes
+      classes,
+      cached: false
     });
 
   } catch (err) {

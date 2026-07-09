@@ -1,10 +1,10 @@
-import { Component, OnInit } from '@angular/core';
+import { Component, ElementRef, Input, OnInit, ViewChild } from '@angular/core';
 import { NavController } from '@ionic/angular';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { IonicModule } from '@ionic/angular';
-import { AlertController } from '@ionic/angular';
-import { ActivatedRoute, RouterModule } from '@angular/router';
+import { AlertController, ModalController } from '@ionic/angular';
+import { ActivatedRoute, Router, RouterModule } from '@angular/router';
 import { LocalDataService, ScannedResult, TopicEntry } from '../../services/local-data.service';
 import { AnswerSheetGeneratorPage } from '../answer-sheet-generator/answer-sheet-generator.page';
 import { ClassStudent, TeacherService } from '../../services/teacher.service';
@@ -21,7 +21,8 @@ export class TosPage implements OnInit {
   subjectId!: number;
   className = '';
   subjectName = '';
-  viewMode: 'edit' | 'print' | 'answersheet' | 'students' = 'edit';
+  @ViewChild('modeSegment', { read: ElementRef }) modeSegment!: ElementRef<HTMLElement>;
+  viewMode: 'overview' | 'edit' | 'print' | 'answersheet' | 'students' | 'responses' = 'overview';
 
   tos: TopicEntry[] = [];
   totalItems = 0;
@@ -37,16 +38,337 @@ export class TosPage implements OnInit {
   topicJumpIndex: number | null = null;
   private expandedTopicIndexes = new Set<number>();
   private previousTos: TopicEntry[] = []; // Store TOS before edits for comparison
+  responseOptions: Array<'A' | 'B' | 'C' | 'D'> = ['A', 'B', 'C', 'D'];
+
+  // Student Participation & Cognitive Performance Metrics
+  totalStudents = 0;
+  studentsScanned = 0;
+  studentsNotScanned = 0;
+  studentsCognitiveBreakdown: Record<string, { correct: number; total: number; percent: number }> = {};
+  studentsPerformanceGood = 0;    // 75%+ average
+  studentsPerformanceAverage = 0; // 50-75% average
+  studentsPerformanceStruggling = 0; // <50% average
+
+  // For tracking student performance data (used for filtering)
+  private studentPerformanceMap = new Map<number, { name: string; rollNumber?: string; percentage: number }>();
+  private scannedStudentIds = new Set<number>();
 
   getTotal(field: keyof TopicEntry): number {
   return this.tos.reduce((sum, topic) => sum + (Number(topic[field]) || 0), 0);
 }
 
+  /**
+   * Calculate overall student participation and cognitive performance metrics
+   */
+  private computeOverallMetrics() {
+    this.totalStudents = this.students.length;
+    this.studentsScanned = 0;
+    this.studentsNotScanned = 0;
+    this.studentsPerformanceGood = 0;
+    this.studentsPerformanceAverage = 0;
+    this.studentsPerformanceStruggling = 0;
+
+    // Clear maps
+    this.studentPerformanceMap.clear();
+    this.scannedStudentIds.clear();
+
+    // Initialize cognitive breakdown
+    this.studentsCognitiveBreakdown = {
+      'Remember (R)': { correct: 0, total: 0, percent: 0 },
+      'Understand (U)': { correct: 0, total: 0, percent: 0 },
+      'Apply (A)': { correct: 0, total: 0, percent: 0 },
+      'Analyze (A)': { correct: 0, total: 0, percent: 0 },
+      'Evaluate (E)': { correct: 0, total: 0, percent: 0 },
+      'Create (C)': { correct: 0, total: 0, percent: 0 }
+    };
+
+    let totalCognitiveCorrect = 0;
+    let totalCognitiveItems = 0;
+
+    // Process each student
+    for (const student of this.students) {
+      const summary = this.studentSummaryById.get(student.id);
+      
+      if (!summary || summary.attempts === 0) {
+        // Student has NOT scanned
+        this.studentsNotScanned++;
+      } else {
+        // Student HAS scanned
+        this.studentsScanned++;
+        this.scannedStudentIds.add(student.id);
+
+        // Categorize by performance
+        const avgPct = summary.avgPct;
+        this.studentPerformanceMap.set(student.id, {
+          name: student.name,
+          rollNumber: student.roll_number || undefined,
+          percentage: avgPct
+        });
+
+        if (avgPct >= 75) {
+          this.studentsPerformanceGood++;
+        } else if (avgPct >= 50) {
+          this.studentsPerformanceAverage++;
+        } else {
+          this.studentsPerformanceStruggling++;
+        }
+
+        // Aggregate cognitive breakdown from latest result
+        if (summary.latest && summary.latest.cognitiveBreakdown) {
+          const breakdown = summary.latest.cognitiveBreakdown;
+          
+          // Map cognitive levels
+          const levelMap: Record<string, string> = {
+            'remembering': 'Remember (R)',
+            'understanding': 'Understand (U)',
+            'applying': 'Apply (A)',
+            'analyzing': 'Analyze (A)',
+            'evaluating': 'Evaluate (E)',
+            'creating': 'Create (C)'
+          };
+
+          for (const [level, data] of Object.entries(breakdown)) {
+            const mappedLevel = levelMap[level] || level;
+            if (this.studentsCognitiveBreakdown[mappedLevel]) {
+              this.studentsCognitiveBreakdown[mappedLevel].correct += (data as any).correct || 0;
+              this.studentsCognitiveBreakdown[mappedLevel].total += (data as any).total || 0;
+              totalCognitiveCorrect += (data as any).correct || 0;
+              totalCognitiveItems += (data as any).total || 0;
+            }
+          }
+        }
+      }
+    }
+
+    // Calculate percentages for cognitive breakdown
+    for (const level in this.studentsCognitiveBreakdown) {
+      const data = this.studentsCognitiveBreakdown[level];
+      data.percent = data.total > 0 ? (data.correct / data.total) * 100 : 0;
+    }
+  }
+
+  /**
+   * Get cognitive level performance with color indicator
+   */
+  getCognitivePerformanceColor(percent: number): string {
+    if (percent >= 75) return 'success';
+    if (percent >= 50) return 'warning';
+    return 'danger';
+  }
+
+  /**
+   * Get performance category color
+   */
+  getPerformanceCategoryColor(category: 'good' | 'average' | 'struggling'): string {
+    switch(category) {
+      case 'good': return 'success';
+      case 'average': return 'warning';
+      case 'struggling': return 'danger';
+    }
+  }
+
+  /**
+   * Get not scanned students list
+   */
+  getNotScannedStudents(): ClassStudent[] {
+    return (this.students || []).filter(s => {
+      const summary = this.studentSummaryById.get(s.id);
+      return !summary || summary.attempts === 0;
+    });
+  }
+
+  /**
+   * Get scanned students list
+   */
+  getScannedStudents(): { name: string; rollNumber?: string; percentage: number }[] {
+    const scanned: { name: string; rollNumber?: string; percentage: number }[] = [];
+    this.studentPerformanceMap.forEach((data, studentId) => {
+      scanned.push(data);
+    });
+    return scanned.sort((a, b) => a.name.localeCompare(b.name));
+  }
+
+  /**
+   * Get good performance students (≥75%)
+   */
+  getGoodStudents(): { name: string; rollNumber?: string; percentage: number }[] {
+    const good: { name: string; rollNumber?: string; percentage: number }[] = [];
+    this.studentPerformanceMap.forEach((data, studentId) => {
+      if (data.percentage >= 75) {
+        good.push(data);
+      }
+    });
+    return good.sort((a, b) => b.percentage - a.percentage);
+  }
+
+  /**
+   * Get average performance students (50-75%)
+   */
+  getAverageStudents(): { name: string; rollNumber?: string; percentage: number }[] {
+    const average: { name: string; rollNumber?: string; percentage: number }[] = [];
+    this.studentPerformanceMap.forEach((data, studentId) => {
+      if (data.percentage >= 50 && data.percentage < 75) {
+        average.push(data);
+      }
+    });
+    return average.sort((a, b) => b.percentage - a.percentage);
+  }
+
+  /**
+   * Get struggling performance students (<50%)
+   */
+  getStrugglingStudents(): { name: string; rollNumber?: string; percentage: number }[] {
+    const struggling: { name: string; rollNumber?: string; percentage: number }[] = [];
+    this.studentPerformanceMap.forEach((data, studentId) => {
+      if (data.percentage < 50) {
+        struggling.push(data);
+      }
+    });
+    return struggling.sort((a, b) => a.percentage - b.percentage);
+  }
+
+  get questionResponseBreakdown(): Array<{
+    question: number;
+    correctAnswer: string | null;
+    responses: Record<'A' | 'B' | 'C' | 'D', Array<{ name: string; rollNumber?: string | null }>>;
+  }> {
+    const questionMap = new Map<number, {
+      correctAnswer: string | null;
+      responses: Record<'A' | 'B' | 'C' | 'D', Array<{ name: string; rollNumber?: string | null }>>;
+    }>();
+
+    this.subjectResults.forEach(result => {
+      result.answers?.forEach(answer => {
+        if (answer.question == null) return;
+        const question = Number(answer.question);
+        const existing = questionMap.get(question) || {
+          correctAnswer: answer.correctAnswer || null,
+          responses: { A: [], B: [], C: [], D: [] }
+        };
+
+        if (!existing.correctAnswer && answer.correctAnswer) {
+          existing.correctAnswer = answer.correctAnswer;
+        }
+
+        const option = (answer.marked || '').toUpperCase() as 'A' | 'B' | 'C' | 'D';
+        if (this.responseOptions.includes(option)) {
+          existing.responses[option].push({
+            name: result.studentName || `Student ${result.id}`,
+            rollNumber: result.rollNumber || null
+          });
+        }
+
+        questionMap.set(question, existing);
+      });
+    });
+
+    return Array.from(questionMap.entries())
+      .sort((a, b) => a[0] - b[0])
+      .map(([question, data]) => ({
+        question,
+        correctAnswer: data.correctAnswer,
+        responses: data.responses
+      }));
+  }
+
+  getOptionResponses(
+    item: { responses: Record<'A' | 'B' | 'C' | 'D', Array<{ name: string; rollNumber?: string | null }>> },
+    option: 'A' | 'B' | 'C' | 'D'
+  ): Array<{ name: string; rollNumber?: string | null }> {
+    const responses = item.responses?.[option] || [];
+    const seen = new Map<string, { name: string; rollNumber?: string | null }>();
+    responses.forEach(student => {
+      const key = `${student.rollNumber ?? ''}|${student.name?.trim().toLowerCase()}`;
+      if (!seen.has(key)) {
+        seen.set(key, student);
+      }
+    });
+    return Array.from(seen.values());
+  }
+
+  getOptionResponseLabel(
+    item: { responses: Record<'A' | 'B' | 'C' | 'D', Array<{ name: string; rollNumber?: string | null }>> },
+    option: 'A' | 'B' | 'C' | 'D',
+    previewCount = 4
+  ): string {
+    const responses = this.getOptionResponses(item, option);
+    if (!responses.length) {
+      return 'No responses';
+    }
+
+    const preview = responses.slice(0, previewCount)
+      .map(r => `${r.name}${r.rollNumber ? ` (${r.rollNumber})` : ''}`);
+
+    const remaining = responses.length - preview.length;
+    return preview.join(', ') + (remaining > 0 ? `, +${remaining} more` : '');
+  }
+
+  async showResponseOptionList(
+    item: { question: number; responses: Record<'A' | 'B' | 'C' | 'D', Array<{ name: string; rollNumber?: string | null }>> },
+    option: 'A' | 'B' | 'C' | 'D'
+  ) {
+    const students = this.getOptionResponses(item, option);
+    const title = `Question ${item.question} — ${option} responses (${students.length})`;
+    console.log('[TOS] navigating to response page', title, students.length);
+
+    await this.router.navigate(['responses', item.question, option], {
+      relativeTo: this.route,
+      state: {
+        students,
+        title
+      }
+    });
+  }
+
+  /**
+   * Show modal with student list for a category
+   */
+  async showStudentList(type: 'scanned' | 'notScanned' | 'good' | 'average' | 'struggling') {
+    let students: { name: string; rollNumber?: string; percentage?: number }[] = [];
+    let title = '';
+
+    switch (type) {
+      case 'scanned':
+        students = this.getScannedStudents();
+        title = `Scanned Students (${students.length})`;
+        break;
+      case 'notScanned':
+        students = this.getNotScannedStudents().map(s => ({ name: s.name, rollNumber: s.roll_number || undefined }));
+        title = `Not Scanned Students (${students.length})`;
+        break;
+      case 'good':
+        students = this.getGoodStudents();
+        title = `Good Performance Students ≥75% (${students.length})`;
+        break;
+      case 'average':
+        students = this.getAverageStudents();
+        title = `Average Performance Students 50-75% (${students.length})`;
+        break;
+      case 'struggling':
+        students = this.getStrugglingStudents();
+        title = `Struggling Students <50% (${students.length})`;
+        break;
+    }
+
+    const modal = await this.modalController.create({
+      component: StudentListModalComponent,
+      componentProps: {
+        title: title,
+        students: students
+      },
+      cssClass: 'student-list-modal'
+    });
+
+    await modal.present();
+  }
+
   constructor(
     private route: ActivatedRoute,
+    private router: Router,
     private teacherService: TeacherService,
     private navCtrl: NavController,
-    private alertController: AlertController
+    private alertController: AlertController,
+    private modalController: ModalController
   ) {}
 
   private async presentAlert(message: string, header = '') {
@@ -93,6 +415,9 @@ export class TosPage implements OnInit {
 
       this.studentSummaryById.set(s.id, { attempts, avgPct, latest: latest || undefined });
     }
+
+    // Compute overall metrics after individual summaries are ready
+    this.computeOverallMetrics();
   }
 
   async loadStudents() {
@@ -345,7 +670,7 @@ export class TosPage implements OnInit {
     await this.refreshResultsForStudents();
   }
 
-  setMode(mode: 'edit' | 'print' | 'answersheet' | 'students') {
+  setMode(mode: 'overview' | 'edit' | 'print' | 'answersheet' | 'students' | 'responses') {
     this.viewMode = mode;
 
     // Automatically trigger print when entering print mode
@@ -354,11 +679,26 @@ export class TosPage implements OnInit {
         window.print();
       }, 300);
     }
+
+    setTimeout(() => this.scrollActiveSegmentIntoView(), 50);
   }
 
-  onModeChange(mode: 'edit' | 'print' | 'answersheet' | 'students') {
+  onModeChange(mode: 'overview' | 'edit' | 'print' | 'answersheet' | 'students' | 'responses') {
     this.setMode(mode);
   }
+
+  private scrollActiveSegmentIntoView() {
+    const segmentEl: HTMLElement = this.modeSegment?.nativeElement;
+    if (!segmentEl) {
+      return;
+    }
+
+    const activeButton = segmentEl.querySelector('ion-segment-button[aria-checked="true"], ion-segment-button.ion-activated, ion-segment-button.ion-selected');
+    if (activeButton instanceof HTMLElement) {
+      activeButton.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
+    }
+  }
+
   addTopicRow() {
   this.tos.push({
     topicName: '',
@@ -712,4 +1052,247 @@ export class TosPage implements OnInit {
     );
   }
 
+  /**
+   * Show help modal for TOS fields
+   */
+  async showHelp(type: 'topicName' | 'competency' | 'days' | 'percent' | 'plannedItems' | 'blooms' | 'overview') {
+    const helpContent: Record<string, { title: string; content: string }> = {
+      topicName: {
+        title: 'Topic Name',
+        content: `<p><strong>Enter the name of the topic you're teaching.</strong></p>
+          <p><strong>Examples:</strong></p>
+          <ul>
+            <li>Photosynthesis</li>
+            <li>Fractions</li>
+            <li>World War II</li>
+            <li>Respiration</li>
+          </ul>
+          <p>Make it clear and specific so students understand what they're being tested on.</p>`
+      },
+      competency: {
+        title: 'Learning Competency',
+        content: `<p><strong>Describe what students should be able to do after learning this topic.</strong></p>
+          <p><strong>Use simple language:</strong></p>
+          <ul>
+            <li>"Students can explain photosynthesis"</li>
+            <li>"Students can solve fraction problems"</li>
+            <li>"Students can identify causes of WW2"</li>
+          </ul>
+          <p>Focus on the learning outcome, not the topic itself.</p>`
+      },
+      days: {
+        title: 'Number of Days',
+        content: `<p><strong>How many days did you spend teaching this topic?</strong></p>
+          <p><strong>Example:</strong></p>
+          <ul>
+            <li>If you taught it for 2 weeks = 10 days</li>
+            <li>If you taught it for 1 week = 5 days</li>
+          </ul>
+          <p>This helps show how much time was spent on each topic.</p>`
+      },
+      percent: {
+        title: 'Percentage (%)',
+        content: `<p><strong>What percentage of the exam will test this topic?</strong></p>
+          <p><strong>Example:</strong></p>
+          <ul>
+            <li>If the topic is 25% of content = enter 25</li>
+            <li>If all topics together = 100%</li>
+          </ul>
+          <p>This ensures balanced exam questions across all topics.</p>`
+      },
+      plannedItems: {
+        title: 'Planned Items',
+        content: `<p><strong>How many questions do you plan to ask about this topic?</strong></p>
+          <p><strong>Example:</strong></p>
+          <ul>
+            <li>If your exam has 50 questions total</li>
+            <li>And 25% of content is photosynthesis</li>
+            <li>Then planned items = 12-13 questions</li>
+          </ul>
+          <p>This is your target number of questions.</p>`
+      },
+      blooms: {
+        title: 'Bloom\'s Cognitive Levels',
+        content: `<p><strong>These are the thinking levels. Distribute your questions across different levels:</strong></p>
+          <ul>
+            <li><strong>Remembering (R):</strong> Simple recall facts (What? Define?)</li>
+            <li><strong>Understanding (U):</strong> Explain ideas (Explain? Summarize?)</li>
+            <li><strong>Applying (A):</strong> Use knowledge in new situations (How would you...? Solve?)</li>
+            <li><strong>Analyzing (A):</strong> Break down and compare (Compare? Why?)</li>
+            <li><strong>Evaluating (E):</strong> Make judgments (Defend? Criticize?)</li>
+            <li><strong>Creating (C):</strong> Build something new (Design? Create?)</li>
+          </ul>
+          <p><strong>Example for 10 questions:</strong></p>
+          <ul>
+            <li>R: 3 questions</li>
+            <li>U: 2 questions</li>
+            <li>A: 2 questions</li>
+            <li>A: 1 question</li>
+            <li>E: 1 question</li>
+            <li>C: 1 question</li>
+          </ul>`
+      },
+      overview: {
+        title: 'What is a Table of Specification?',
+        content: `<p><strong>A Table of Specification (TOS) is a blueprint for your exam:</strong></p>
+          <ul>
+            <li>✓ Lists all topics you taught</li>
+            <li>✓ Shows how many questions for each topic</li>
+            <li>✓ Ensures balanced exam questions</li>
+            <li>✓ Uses Bloom's Cognitive Levels</li>
+            <li>✓ Helps create fair assessments</li>
+          </ul>
+          <p>It ensures your exam fairly represents what you taught in class. Without it, your exam might focus too much on one topic and miss others.</p>
+          <p><strong>For non-technical teachers:</strong> Think of it like a recipe. Just as a recipe lists ingredients and amounts, a TOS lists topics and how many questions each should have.</p>`
+      }
+    };
+
+    const helpData = helpContent[type] || { title: 'Help', content: '<p>No information available.</p>' };
+    
+    const modal = await this.modalController.create({
+      component: HelpModalComponent,
+      componentProps: {
+        title: helpData.title,
+        content: helpData.content
+      },
+      cssClass: 'help-modal'
+    });
+    
+    await modal.present();
+  }
+
+}
+
+// Help Modal Component
+@Component({
+  selector: 'app-help-modal',
+  template: `
+    <ion-header>
+      <ion-toolbar>
+        <ion-title>{{ title }}</ion-title>
+        <ion-buttons slot="end">
+          <ion-button (click)="close()">
+            <ion-icon name="close"></ion-icon>
+          </ion-button>
+        </ion-buttons>
+      </ion-toolbar>
+    </ion-header>
+    <ion-content class="ion-padding">
+      <div [innerHTML]="content"></div>
+      <div class="response-modal-actions">
+        <ion-button expand="block" fill="outline" (click)="close()">Close</ion-button>
+      </div>
+    </ion-content>
+  `,
+  standalone: true,
+  imports: [IonicModule, CommonModule]
+})
+export class HelpModalComponent {
+  @Input() title = '';
+  @Input() content = '';
+
+  constructor(private modalController: ModalController) {}
+
+  async close() {
+    try {
+      await this.modalController.dismiss(undefined, undefined, 'tos-response-modal');
+      return;
+    } catch (e) {
+      console.warn('[TOS] HelpModalComponent close by id failed', e);
+    }
+
+    try {
+      await this.modalController.dismiss();
+      return;
+    } catch (e) {
+      console.warn('[TOS] HelpModalComponent close failed', e);
+    }
+
+    try {
+      const topModal = await this.modalController.getTop();
+      if (topModal) {
+        await topModal.dismiss();
+      }
+    } catch (nestedError) {
+      console.warn('[TOS] HelpModalComponent fallback close failed', nestedError);
+    }
+  }
+}
+
+// Student List Modal Component
+@Component({
+  selector: 'app-student-list-modal',
+  template: `
+    <ion-header>
+      <ion-toolbar>
+        <ion-title>{{ title }}</ion-title>
+        <ion-buttons slot="end">
+          <ion-button fill="clear" type="button" (click)="close()">
+            <ion-icon name="close"></ion-icon>
+          </ion-button>
+        </ion-buttons>
+      </ion-toolbar>
+    </ion-header>
+    <ion-content class="ion-padding">
+      <ion-button expand="block" fill="outline" style="margin-bottom: 12px;" (click)="close()">Close</ion-button>
+      <ion-list *ngIf="students.length > 0">
+        <ion-item *ngFor="let student of students; let i = index" lines="inset">
+          <ion-label>
+            <div style="font-weight: 900; font-size: 16px;">{{ i + 1 }}. {{ student.name }}</div>
+            <div style="font-size: 12px; opacity: 0.7;" *ngIf="student.rollNumber">
+              Roll: #{{ student.rollNumber }}
+            </div>
+            <div style="font-size: 13px; color: #2563eb; font-weight: 700; margin-top: 4px;" *ngIf="student.percentage !== undefined">
+              {{ student.percentage.toFixed(1) }}%
+            </div>
+          </ion-label>
+        </ion-item>
+      </ion-list>
+      <div *ngIf="students.length === 0" style="text-align: center; padding: 40px 20px; opacity: 0.6;">
+        <p>No students in this category</p>
+      </div>
+    </ion-content>
+  `,
+  standalone: true,
+  imports: [IonicModule, CommonModule]
+})
+export class StudentListModalComponent {
+  title!: string;
+  students!: { name: string; rollNumber?: string; percentage?: number }[];
+
+  constructor(private modalController: ModalController) {}
+
+  async close() {
+    console.log('[TOS] response modal close clicked');
+    try {
+      const topModal = await this.modalController.getTop();
+      console.log('[TOS] getTop result', topModal);
+      if (topModal) {
+        await topModal.dismiss();
+        console.log('[TOS] dismissed top modal');
+        return;
+      }
+    } catch (e) {
+      console.warn('[TOS] Could not dismiss top modal', e);
+    }
+
+    try {
+      const modals = Array.from(document.querySelectorAll('ion-modal')) as any[];
+      console.log('[TOS] found ion-modal overlays', modals.length);
+      if (modals.length) {
+        await modals[modals.length - 1].dismiss();
+        console.log('[TOS] dismissed DOM ion-modal');
+        return;
+      }
+    } catch (e) {
+      console.warn('[TOS] DOM dismiss failed', e);
+    }
+
+    try {
+      await this.modalController.dismiss();
+      console.log('[TOS] dismissed fallback modal');
+    } catch (e) {
+      console.warn('[TOS] Fallback dismiss failed', e);
+    }
+  }
 }

@@ -4,6 +4,13 @@ const router = express.Router();
 const { verifyToken } = require('../middleware/auth');
 const { firebaseAuthAdmin, firebaseDbAdmin } = require('../config/firebaseAdmin');
 
+// Simple in-memory cache for dashboard metrics
+const dashboardCache = {
+  data: null,
+  timestamp: 0,
+  ttlMs: 120000 // 120 seconds cache (2 minutes) for faster loading
+};
+
 async function requireAdmin(req, res) {
   try {
     let userType = req.user?.userType;
@@ -33,17 +40,28 @@ router.get('/metrics/dashboard', verifyToken, async (req, res) => {
   try {
     if (!(await requireAdmin(req, res))) return;
 
+    // Check cache first
+    const now = Date.now();
+    if (dashboardCache.data && (now - dashboardCache.timestamp) < dashboardCache.ttlMs) {
+      return res.json({
+        success: true,
+        data: dashboardCache.data,
+        cached: true,
+        responseTimeMs: Date.now() - now
+      });
+    }
+
     const startedAt = Date.now();
     const db = firebaseDbAdmin();
 
-    const now = new Date();
-    const start = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+    const dateNow = new Date();
+    const start = new Date(dateNow.getFullYear(), dateNow.getMonth(), dateNow.getDate()).getTime();
     const end = start + 24 * 60 * 60 * 1000;
 
     const [usersSnap, classesSnap, scansSnap] = await Promise.all([
-      db.collection('users').get(),
-      db.collectionGroup('classes').get(),
-      db.collectionGroup('results').get()
+      db.collection('users').select('userType').get(),
+      db.collectionGroup('classes').select().get(),
+      db.collectionGroup('results').select().get()
     ]);
 
     let totalTeachers = 0;
@@ -59,6 +77,7 @@ router.get('/metrics/dashboard', verifyToken, async (req, res) => {
     try {
       const subjectsTodaySnap = await db
         .collectionGroup('subjects')
+        .select('questions', 'questionsUpdatedAt')
         .where('questionsUpdatedAt', '>=', start)
         .where('questionsUpdatedAt', '<', end)
         .get();
@@ -69,7 +88,7 @@ router.get('/metrics/dashboard', verifyToken, async (req, res) => {
         questionsGeneratedToday += list.length;
       });
     } catch (e) {
-      const subjectsSnap = await db.collectionGroup('subjects').get();
+      const subjectsSnap = await db.collectionGroup('subjects').select('questions', 'questionsUpdatedAt').get();
       subjectsSnap.forEach((doc) => {
         const data = doc.data() || {};
         const updatedAt = Number(data.questionsUpdatedAt);
@@ -80,18 +99,25 @@ router.get('/metrics/dashboard', verifyToken, async (req, res) => {
       });
     }
 
+    const responseData = {
+      totalUsers: usersSnap.size,
+      totalTeachers,
+      totalAdmins,
+      totalClasses: classesSnap.size,
+      totalScannedPapers: scansSnap.size,
+      questionsGeneratedToday,
+      computedAt: new Date().toISOString(),
+      responseTimeMs: Date.now() - startedAt
+    };
+
+    // Update cache
+    dashboardCache.data = responseData;
+    dashboardCache.timestamp = Date.now();
+
     return res.json({
       success: true,
-      data: {
-        totalUsers: usersSnap.size,
-        totalTeachers,
-        totalAdmins,
-        totalClasses: classesSnap.size,
-        totalScannedPapers: scansSnap.size,
-        questionsGeneratedToday,
-        computedAt: new Date().toISOString(),
-        responseTimeMs: Date.now() - startedAt
-      }
+      data: responseData,
+      cached: false
     });
   } catch (err) {
     console.error('admin/metrics/dashboard error:', err);

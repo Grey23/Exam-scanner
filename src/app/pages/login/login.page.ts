@@ -16,6 +16,7 @@ export class LoginPage {
   showPassword = false;
   loginSuccess = false;
   logoutSuccess = false;
+  errorMessage = '';
 
   constructor(
     private authService: AuthService,
@@ -56,6 +57,7 @@ export class LoginPage {
 
     if (result.success) {
       this.loginSuccess = true;
+      this.errorMessage = '';
 
       const user = this.authService.getCurrentUser();
       let target = '/teacher-dashboard';
@@ -69,7 +71,7 @@ export class LoginPage {
         void this.router.navigate([target]);
       }, 700);
     } else {
-      await this.showToast(result.message);
+      this.errorMessage = result.message;
     }
 
     this.isLoading = false;

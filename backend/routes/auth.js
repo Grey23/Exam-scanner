@@ -5,6 +5,18 @@ const jwt = require('jsonwebtoken');
 const pool = require('../config/database');
 const { verifyToken } = require('../middleware/auth');
 
+const JWT_SECRET = process.env.JWT_SECRET;
+if (!JWT_SECRET) {
+  console.error('FATAL: JWT_SECRET is not configured. Auth routes require JWT signing secret.');
+}
+
+function getJwtSecret() {
+  if (!JWT_SECRET) {
+    throw new Error('Server misconfiguration: JWT_SECRET is required');
+  }
+  return JWT_SECRET;
+}
+
 // REGISTER - Save user to database
 router.post('/register', async (req, res) => {
   try {
@@ -97,6 +109,10 @@ router.post('/register', async (req, res) => {
     console.log('✅ User inserted with ID:', result.insertId);
     connection.release();
 
+    if (!JWT_SECRET) {
+      throw new Error('Server misconfiguration: JWT_SECRET is required');
+    }
+
     // Generate token
     const token = jwt.sign(
       { 
@@ -105,7 +121,7 @@ router.post('/register', async (req, res) => {
         name, 
         userType 
       },
-      process.env.JWT_SECRET || 'your-secret-key',
+      getJwtSecret(),
       { expiresIn: '7d' }
     );
 
@@ -167,6 +183,10 @@ router.post('/login', async (req, res) => {
 
     connection.release();
 
+    if (!JWT_SECRET) {
+      throw new Error('Server misconfiguration: JWT_SECRET is required');
+    }
+
     // Generate token
     const token = jwt.sign(
       {
@@ -175,7 +195,7 @@ router.post('/login', async (req, res) => {
         name: user.name,
         userType: user.user_type
       },
-      process.env.JWT_SECRET || 'your-secret-key',
+      getJwtSecret(),
       { expiresIn: '7d' }
     );
 

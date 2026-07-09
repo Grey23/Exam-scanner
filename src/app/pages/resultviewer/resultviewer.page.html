@@ -4,15 +4,44 @@
       <ion-back-button defaultHref="/dashboard"></ion-back-button>
     </ion-buttons>
     <ion-title>Result Details</ion-title>
+    <ion-buttons slot="end">
+      <ion-button (click)="showHelp('general')">
+        <ion-icon name="help-circle-outline"></ion-icon>
+      </ion-button>
+    </ion-buttons>
   </ion-toolbar>
 </ion-header>
 
 <ion-content class="ion-padding">
   <div *ngIf="result" id="print-area">
+    <!-- Tab Navigation -->
+    <ion-segment [(ngModel)]="activeTab" (ionChange)="switchTab(activeTab)">
+      <ion-segment-button value="details">
+        <ion-label>Details</ion-label>
+      </ion-segment-button>
+      <ion-segment-button value="review">
+        <ion-label>Review</ion-label>
+      </ion-segment-button>
+      <ion-segment-button value="responses">
+        <ion-label>Responses</ion-label>
+      </ion-segment-button>
+      <ion-segment-button value="statistics">
+        <ion-label>Statistics</ion-label>
+      </ion-segment-button>
+    </ion-segment>
+
+    <!-- Details Tab Content -->
+    <div [ngSwitch]="activeTab">
+      <div *ngSwitchCase="'details'">
     <!-- Score summary + mean percentage -->
     <ion-card class="score-card">
       <ion-card-header>
-        <ion-card-title>Score</ion-card-title>
+        <div class="card-header-row">
+          <ion-card-title>Score</ion-card-title>
+          <ion-button fill="clear" size="small" (click)="showHelp('score')">
+            <ion-icon name="help-circle-outline"></ion-icon>
+          </ion-button>
+        </div>
         <ion-card-subtitle>{{ result.timestamp | date: 'medium' }}</ion-card-subtitle>
       </ion-card-header>
       <ion-card-content>
@@ -36,36 +65,57 @@
     <!-- Combined cognitive chart -->
     <ion-card class="chart-card">
       <ion-card-header>
-        <ion-card-title>Cognitive Performance</ion-card-title>
-        <ion-card-subtitle>Combined (% correct per level)</ion-card-subtitle>
+        <div class="card-header-row">
+          <ion-card-title>Cognitive Performance</ion-card-title>
+          <ion-button fill="clear" size="small" (click)="showHelp('cognitive')">
+            <ion-icon name="help-circle-outline"></ion-icon>
+          </ion-button>
+        </div>
+        <ion-card-subtitle>How well you did at each thinking level</ion-card-subtitle>
       </ion-card-header>
       <ion-card-content>
-        <canvas id="cognitiveCombinedChart"></canvas>
+        <div class="chart-container">
+          <canvas id="cognitiveCombinedChart"></canvas>
+        </div>
       </ion-card-content>
     </ion-card>
 
     <!-- Topic analytics: good at / needs improvement -->
     <ion-card class="analytics-card" *ngIf="strongestTopics.length">
       <ion-card-header>
-        <ion-card-title>Topics you're good at</ion-card-title>
+        <div class="card-header-row">
+          <ion-card-title>✓ Topics you're good at</ion-card-title>
+          <ion-button fill="clear" size="small" (click)="showHelp('topic')">
+            <ion-icon name="help-circle-outline"></ion-icon>
+          </ion-button>
+        </div>
       </ion-card-header>
       <ion-card-content>
         <div class="topic-tags strong">
-          <span class="topic-tag" *ngFor="let t of strongestTopics">
-            {{ t.topic }} — {{ t.correct }}/{{ t.total }} ({{ t.percent }}%)
-          </span>
+          <div class="topic-tag" *ngFor="let t of strongestTopics">
+            <span class="topic-name">{{ t.topic }}</span>
+            <span class="topic-score">{{ t.correct }}/{{ t.total }}</span>
+            <span class="topic-percent">{{ t.percent }}%</span>
+          </div>
         </div>
       </ion-card-content>
     </ion-card>
     <ion-card class="analytics-card weak" *ngIf="weakestTopics.length">
       <ion-card-header>
-        <ion-card-title>Needs improvement</ion-card-title>
+        <div class="card-header-row">
+          <ion-card-title>⚠ Topics to improve</ion-card-title>
+          <ion-button fill="clear" size="small" (click)="showHelp('topic')">
+            <ion-icon name="help-circle-outline"></ion-icon>
+          </ion-button>
+        </div>
       </ion-card-header>
       <ion-card-content>
         <div class="topic-tags">
-          <span class="topic-tag weak" *ngFor="let t of weakestTopics">
-            {{ t.topic }} — {{ t.correct }}/{{ t.total }} ({{ t.percent }}%)
-          </span>
+          <div class="topic-tag weak" *ngFor="let t of weakestTopics">
+            <span class="topic-name">{{ t.topic }}</span>
+            <span class="topic-score">{{ t.correct }}/{{ t.total }}</span>
+            <span class="topic-percent">{{ t.percent }}%</span>
+          </div>
         </div>
       </ion-card-content>
     </ion-card>
@@ -73,25 +123,39 @@
     <!-- Cognitive analytics: strong/weak -->
     <ion-card class="analytics-card" *ngIf="strongestCognitiveLevels.length">
       <ion-card-header>
-        <ion-card-title>Cognitive levels you're strong at</ion-card-title>
+        <div class="card-header-row">
+          <ion-card-title>✓ Strong thinking skills</ion-card-title>
+          <ion-button fill="clear" size="small" (click)="showHelp('cognitive')">
+            <ion-icon name="help-circle-outline"></ion-icon>
+          </ion-button>
+        </div>
       </ion-card-header>
       <ion-card-content>
         <div class="topic-tags strong">
-          <span class="topic-tag" *ngFor="let c of strongestCognitiveLevels">
-            {{ c.level }} — {{ c.correct }}/{{ c.total }} ({{ c.percent }}%)
-          </span>
+          <div class="topic-tag" *ngFor="let c of strongestCognitiveLevels">
+            <span class="topic-name">{{ c.level }}</span>
+            <span class="topic-score">{{ c.correct }}/{{ c.total }}</span>
+            <span class="topic-percent">{{ c.percent }}%</span>
+          </div>
         </div>
       </ion-card-content>
     </ion-card>
     <ion-card class="analytics-card weak" *ngIf="weakestCognitiveLevels.length">
       <ion-card-header>
-        <ion-card-title>Cognitive levels to improve</ion-card-title>
+        <div class="card-header-row">
+          <ion-card-title>⚠ Thinking skills to improve</ion-card-title>
+          <ion-button fill="clear" size="small" (click)="showHelp('cognitive')">
+            <ion-icon name="help-circle-outline"></ion-icon>
+          </ion-button>
+        </div>
       </ion-card-header>
       <ion-card-content>
         <div class="topic-tags">
-          <span class="topic-tag weak" *ngFor="let c of weakestCognitiveLevels">
-            {{ c.level }} — {{ c.correct }}/{{ c.total }} ({{ c.percent }}%)
-          </span>
+          <div class="topic-tag weak" *ngFor="let c of weakestCognitiveLevels">
+            <span class="topic-name">{{ c.level }}</span>
+            <span class="topic-score">{{ c.correct }}/{{ c.total }}</span>
+            <span class="topic-percent">{{ c.percent }}%</span>
+          </div>
         </div>
       </ion-card-content>
     </ion-card>
@@ -99,25 +163,42 @@
     <!-- Charts Section -->
     <ion-card class="chart-card">
       <ion-card-header>
-        <ion-card-title>Graphs</ion-card-title>
-        <ion-card-subtitle>Per topic, competency, and cognitives</ion-card-subtitle>
+        <div class="card-header-row">
+          <ion-card-title>Detailed Graphs</ion-card-title>
+          <ion-button fill="clear" size="small" (click)="showHelp('general')">
+            <ion-icon name="help-circle-outline"></ion-icon>
+          </ion-button>
+        </div>
+        <ion-card-subtitle>Tap charts for details</ion-card-subtitle>
       </ion-card-header>
       <ion-card-content>
-        <h4>Topic Breakdown</h4>
-        <canvas id="topicChart"></canvas>
+        <div class="chart-section">
+          <h4>📊 Topic Breakdown</h4>
+          <div class="chart-container">
+            <canvas id="topicChart"></canvas>
+          </div>
+        </div>
 
-        <h4>Competency Breakdown</h4>
-        <canvas id="competencyChart"></canvas>
+        <div class="chart-section">
+          <h4>📊 Competency Breakdown</h4>
+          <div class="chart-container">
+            <canvas id="competencyChart"></canvas>
+          </div>
+        </div>
 
-        <h4>Cognitive Breakdown</h4>
-        <canvas id="cognitiveChart"></canvas>
+        <div class="chart-section">
+          <h4>📊 Cognitive Breakdown</h4>
+          <div class="chart-container">
+            <canvas id="cognitiveChart"></canvas>
+          </div>
+        </div>
       </ion-card-content>
     </ion-card>
 
     <!-- Scanned paper (moved below analytics) -->
     <ion-card class="scan-card">
       <ion-card-header>
-        <ion-card-title>Scanned Paper</ion-card-title>
+        <ion-card-title>📄 Scanned Paper</ion-card-title>
         <ion-card-subtitle *ngIf="result.studentName || result.rollNumber">
           {{ result.studentName }}<span *ngIf="result.rollNumber"> · Roll: {{ result.rollNumber }}</span>
         </ion-card-subtitle>
@@ -129,37 +210,50 @@
     </ion-card>
 
     <!-- Per-Topic Cognitive Breakdown -->
-    <h3 class="section-title">Per-Topic Cognitive Breakdown</h3>
+    <h3 class="section-title">📚 Per-Topic Details</h3>
     <ion-card class="topic-breakdown-card" *ngFor="let topicData of topicBreakdownData; let i = index">
       <ion-card-header>
-        <ion-card-title>{{ topicData.topic }}</ion-card-title>
+        <div class="card-header-row">
+          <ion-card-title>{{ topicData.topic }}</ion-card-title>
+          <ion-button fill="clear" size="small" (click)="showHelp('topic')">
+            <ion-icon name="help-circle-outline"></ion-icon>
+          </ion-button>
+        </div>
         <ion-card-subtitle>{{ topicData.competency }}</ion-card-subtitle>
       </ion-card-header>
       <ion-card-content>
         <div class="topic-summary">
-          <span class="topic-score">{{ topicData.totalCorrect }}/{{ topicData.totalItems }}</span>
-          <span class="topic-percent">{{ topicData.overallPercent }}%</span>
+          <div class="summary-item">
+            <span class="summary-label">Score:</span>
+            <span class="topic-score">{{ topicData.totalCorrect }}/{{ topicData.totalItems }}</span>
+          </div>
+          <div class="summary-item">
+            <span class="summary-label">Overall:</span>
+            <span class="topic-percent">{{ topicData.overallPercent }}%</span>
+          </div>
         </div>
 
         <!-- Cognitive table -->
-        <table class="cognitive-table">
-          <thead>
-            <tr>
-              <th>Cognitive Level</th>
-              <th>Score</th>
-              <th>Total</th>
-              <th>%</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr *ngFor="let cog of topicData.cognitives">
-              <td>{{ cog.level }}</td>
-              <td>{{ cog.correct }}</td>
-              <td>{{ cog.total }}</td>
-              <td [class.good]="cog.percent >= 70" [class.poor]="cog.percent < 50">{{ cog.percent }}%</td>
-            </tr>
-          </tbody>
-        </table>
+        <div class="cognitive-table-wrapper">
+          <table class="cognitive-table">
+            <thead>
+              <tr>
+                <th>Thinking Level</th>
+                <th>Correct</th>
+                <th>Total</th>
+                <th>%</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr *ngFor="let cog of topicData.cognitives">
+                <td>{{ cog.level }}</td>
+                <td>{{ cog.correct }}</td>
+                <td>{{ cog.total }}</td>
+                <td [class.good]="cog.percent >= 70" [class.poor]="cog.percent < 50">{{ cog.percent }}%</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
 
         <!-- Per-topic chart -->
         <div class="topic-chart-container">
@@ -180,6 +274,220 @@
     </ion-card>
 
     <ion-button expand="full" color="tertiary" (click)="printPage()"> Print Result</ion-button>
+      </div>
+
+      <!-- Review Tab Content -->
+      <div *ngSwitchCase="'review'">
+        <ion-card class="review-summary-card">
+          <ion-card-header>
+            <div class="card-header-row">
+              <ion-card-title>📝 Answer Review</ion-card-title>
+              <ion-button fill="clear" size="small" (click)="showHelp('statistics')">
+                <ion-icon name="help-circle-outline"></ion-icon>
+              </ion-button>
+            </div>
+            <ion-card-subtitle>See which questions were correct and incorrect</ion-card-subtitle>
+          </ion-card-header>
+          <ion-card-content>
+            <div class="statistics-grid">
+              <div class="stat-item">
+                <div class="stat-label">✅ Correct Answers</div>
+                <div class="stat-values">
+                  <span class="stat-value">{{ correctAnswers.length }}</span>
+                  <span class="stat-sep">/</span>
+                  <span class="stat-value">{{ result?.total ?? 0 }}</span>
+                </div>
+              </div>
+              <div class="stat-item">
+                <div class="stat-label">❌ Incorrect Answers</div>
+                <div class="stat-values">
+                  <span class="stat-value">{{ incorrectAnswers.length }}</span>
+                  <span class="stat-sep">/</span>
+                  <span class="stat-value">{{ result?.total ?? 0 }}</span>
+                </div>
+              </div>
+            </div>
+          </ion-card-content>
+        </ion-card>
+
+        <div class="review-filter-row">
+          <ion-searchbar
+            [(ngModel)]="reviewFilterQuery"
+            debounce="300"
+            placeholder="Search question, topic, competency"
+            showCancelButton="focus">
+          </ion-searchbar>
+          <ion-segment [(ngModel)]="reviewFilterType">
+            <ion-segment-button value="all">
+              <ion-label>All</ion-label>
+            </ion-segment-button>
+            <ion-segment-button value="correct">
+              <ion-label>Correct</ion-label>
+            </ion-segment-button>
+            <ion-segment-button value="incorrect">
+              <ion-label>Incorrect</ion-label>
+            </ion-segment-button>
+          </ion-segment>
+        </div>
+
+        <ion-card class="review-card" *ngIf="reviewFilterType !== 'incorrect' && filteredCorrectAnswers.length">
+          <ion-card-header>
+            <ion-card-title>Correct Questions</ion-card-title>
+          </ion-card-header>
+          <ion-card-content>
+            <div class="review-list">
+              <div class="review-item correct" *ngFor="let answer of filteredCorrectAnswers">
+                <div class="review-question">Q{{ answer.question }}</div>
+                <div class="review-detail">
+                  <div>Selected: {{ answer.marked || '—' }}</div>
+                  <div class="review-meta">Topic: {{ answer.topic || 'N/A' }} · Competency: {{ answer.competency || 'N/A' }}</div>
+                </div>
+              </div>
+            </div>
+          </ion-card-content>
+        </ion-card>
+
+        <ion-card class="review-card" *ngIf="reviewFilterType !== 'correct' && filteredIncorrectAnswers.length">
+          <ion-card-header>
+            <ion-card-title>Incorrect Questions</ion-card-title>
+          </ion-card-header>
+          <ion-card-content>
+            <div class="review-list">
+              <div class="review-item incorrect" *ngFor="let answer of filteredIncorrectAnswers">
+                <div class="review-question">Q{{ answer.question }}</div>
+                <div class="review-detail">
+                  <div>Selected: {{ answer.marked || '—' }} • Answer: {{ answer.correctAnswer || '—' }}</div>
+                  <div class="review-meta">Topic: {{ answer.topic || 'N/A' }} · Competency: {{ answer.competency || 'N/A' }}</div>
+                </div>
+              </div>
+            </div>
+          </ion-card-content>
+        </ion-card>
+
+        <ion-card class="warning-card" *ngIf="reviewFilterType === 'all' ? (filteredCorrectAnswers.length + filteredIncorrectAnswers.length === 0) : (reviewFilterType === 'correct' ? filteredCorrectAnswers.length === 0 : filteredIncorrectAnswers.length === 0)">
+          <ion-card-header>
+            <ion-card-title>No matching review items</ion-card-title>
+          </ion-card-header>
+          <ion-card-content>
+            <p>Try a different question number, topic, or competency keyword.</p>
+          </ion-card-content>
+        </ion-card>
+      </div>
+
+      <!-- Responses Tab Content -->
+      <div *ngSwitchCase="'responses'">
+        <ion-card class="review-summary-card">
+          <ion-card-header>
+            <div class="card-header-row">
+              <ion-card-title>🧾 Student Responses</ion-card-title>
+              <ion-button fill="clear" size="small" (click)="showHelp('statistics')">
+                <ion-icon name="help-circle-outline"></ion-icon>
+              </ion-button>
+            </div>
+            <ion-card-subtitle>Correct answer and which students chose each option</ion-card-subtitle>
+          </ion-card-header>
+          <ion-card-content>
+            <p class="review-helper-text">Each question shows the correct answer and the students who selected A, B, C, or D.</p>
+          </ion-card-content>
+        </ion-card>
+
+        <ion-card class="review-card" *ngFor="let item of questionResponseBreakdown">
+          <ion-card-header>
+            <ion-card-title>Question {{ item.question }}</ion-card-title>
+            <ion-card-subtitle>Correct answer: {{ item.correctAnswer || '—' }}</ion-card-subtitle>
+          </ion-card-header>
+          <ion-card-content>
+            <div class="response-group" *ngFor="let option of responseOptions">
+              <div class="response-option-row">
+                <span class="response-option-label">{{ option }}</span>
+                <div class="response-student-list">
+                  <span *ngIf="item.responses[option].length; else noResponses">
+                    <span class="response-student" *ngFor="let student of item.responses[option]; let last = last">
+                      {{ student.name }}<span *ngIf="student.rollNumber"> ({{ student.rollNumber }})</span><span *ngIf="!last">, </span>
+                    </span>
+                  </span>
+                  <ng-template #noResponses>
+                    <span class="response-none">No responses</span>
+                  </ng-template>
+                </div>
+              </div>
+            </div>
+          </ion-card-content>
+        </ion-card>
+      </div>
+
+      <!-- Statistics Tab Content -->
+      <div *ngSwitchCase="'statistics'">
+        <ion-card class="statistics-card">
+          <ion-card-header>
+            <div class="card-header-row">
+              <ion-card-title>📊 Answer Analysis</ion-card-title>
+              <ion-button fill="clear" size="small" (click)="showHelp('statistics')">
+                <ion-icon name="help-circle-outline"></ion-icon>
+              </ion-button>
+            </div>
+            <ion-card-subtitle>Question-by-question breakdown</ion-card-subtitle>
+          </ion-card-header>
+          <ion-card-content>
+            <div class="statistics-grid">
+              <div class="stat-item">
+                <div class="stat-label">✅ Correct Answers</div>
+                <div class="stat-values">
+                  <span class="stat-value">{{ result?.score ?? 0 }}</span>
+                  <span class="stat-sep">/</span>
+                  <span class="stat-value">{{ result?.total ?? 0 }}</span>
+                </div>
+              </div>
+
+              <div class="stat-item">
+                <div class="stat-label">❌ Incorrect Answers</div>
+                <div class="stat-values">
+                  <span class="stat-value">{{ getIncorrectCount() }}</span>
+                  <span class="stat-sep">/</span>
+                  <span class="stat-value">{{ result?.total ?? 0 }}</span>
+                </div>
+              </div>
+
+              <div class="stat-item">
+                <div class="stat-label">📊 Accuracy</div>
+                <div class="stat-values">
+                  <span class="stat-value">{{ getAccuracyPercentage() }}%</span>
+                </div>
+              </div>
+
+              <div class="stat-item">
+                <div class="stat-label">🎯 Mean Percentage</div>
+                <div class="stat-values">
+                  <span class="stat-value">{{ meanPercentage | number:'1.0-0' }}%</span>
+                </div>
+              </div>
+            </div>
+
+            <div class="statistics-legend">
+              <small>Based on this student's scanned paper</small>
+            </div>
+          </ion-card-content>
+        </ion-card>
+
+        <ion-card class="answer-distribution-card" *ngIf="result?.answers">
+          <ion-card-header>
+            <ion-card-title>� Answer Distribution</ion-card-title>
+            <ion-card-subtitle>Selections per option (A, B, C, D)</ion-card-subtitle>
+          </ion-card-header>
+          <ion-card-content>
+            <div class="answer-distribution">
+              <div class="distribution-item" *ngFor="let option of ['A', 'B', 'C', 'D']">
+                <span class="option-label">{{ option }}</span>
+                <div class="option-bar">
+                  <div class="option-fill" [style.width.%]="getAnswerDistribution(option)"></div>
+                </div>
+                <span class="option-count">{{ getAnswerDistribution(option) }}%</span>
+              </div>
+            </div>
+          </ion-card-content>
+        </ion-card>
+      </div>
+    </div>
   </div>
 
   <div *ngIf="!result">

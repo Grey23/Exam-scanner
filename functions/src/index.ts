@@ -116,152 +116,151 @@ apiApp.get("/admin/metrics/dashboard", async (req: Request, res: Response) => {
     const startedAt = Date.now();
     const app = getFirebaseAdminApp();
     const db = app.firestore();
+    const cacheRef = db.collection("dashboard").doc("summary");
 
-    // Calculate today's date range for questionsGeneratedToday
+    const cached = await cacheRef.get().catch(() => null);
+    const cacheData = cached?.exists ? (cached.data() as any) : null;
+    const cacheExpires = Number(cacheData?.cachedUntil || 0);
+    if (cacheExpires > Date.now() && cacheData?.payload) {
+      return res.json({ success: true, data: cacheData.payload, cached: true });
+    }
+
+    const getCountValue = async (query: admin.firestore.Query): Promise<number> => {
+      try {
+        const snap = await query.count().get();
+        return Number((snap.data() as any)?.count || 0);
+      } catch {
+        const snap = await query.get();
+        return snap.size;
+      }
+    };
+
+    const toMilliseconds = (value: any): number => {
+      if (typeof value === 'number') return value;
+      if (typeof value === 'string' && !Number.isNaN(Number(value))) return Number(value);
+      if (value && typeof value.toMillis === 'function') return Number(value.toMillis());
+      if (value && typeof value.seconds === 'number') {
+        return value.seconds * 1000 + Number(value.nanoseconds || 0) / 1_000_000;
+      }
+      return NaN;
+    };
+
     const now = new Date();
-    const start = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
-    const end = start + 24 * 60 * 60 * 1000;
+    const midnight = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+    const dayMs = 24 * 60 * 60 * 1000;
+    const weekStart = midnight - 6 * dayMs;
+    const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
-    // Fetch all data in parallel
-    const [usersSnap, classesSnap, scansSnap] = await Promise.all([
-      db.collection("users").get(),
-      db.collectionGroup("classes").get().catch(() => ({ size: 0, docs: [] })),
-      db.collectionGroup("results").get().catch(() => ({ size: 0, docs: [] }))
+    const [
+      totalUsers,
+      teachersCount,
+      adminsCount,
+      totalClasses
+    ] = await Promise.all([
+      getCountValue(db.collection("users")),
+      getCountValue(db.collection("users").where("userType", "==", "teacher")),
+      getCountValue(db.collection("users").where("userType", "in", ["admin", "school"])),
+      getCountValue(db.collectionGroup("classes"))
     ]);
 
-    const totalUsers = usersSnap.size;
+    const resultsSnap = await db.collectionGroup("results").get().catch(() => null);
+    const totalScannedPapers = resultsSnap ? resultsSnap.size : 0;
 
-    const teachersCount = usersSnap.docs.filter((d) => {
-      const t = (d.data() as any)?.userType;
-      return t === "teacher";
-    }).length;
-
-    const adminsCount = usersSnap.docs.filter((d) => {
-      const t = (d.data() as any)?.userType;
-      return t === "admin" || t === "school";
-    }).length;
-
-    const totalClasses = classesSnap.size;
-    const totalScannedPapers = scansSnap.size;
-
-    // Calculate questions generated today
     let questionsGeneratedToday = 0;
-    try {
-      const subjectsTodaySnap = await db
-        .collectionGroup("subjects")
-        .where("questionsUpdatedAt", ">=", start)
-        .where("questionsUpdatedAt", "<", end)
-        .get();
+    const questionsByDay: { day: string; count: number }[] = [];
+    const dailyQuestionCounts = Array.from({ length: 7 }, () => 0);
 
-      subjectsTodaySnap.forEach((doc) => {
+    const subjectsSnap = await db.collectionGroup("subjects").get().catch(() => null);
+    if (subjectsSnap) {
+      subjectsSnap.forEach((doc) => {
         const data = doc.data() || {};
+        const updatedAt = toMilliseconds((data as any).questionsUpdatedAt);
+        if (!Number.isFinite(updatedAt) || updatedAt < weekStart || updatedAt >= midnight + dayMs) {
+          return;
+        }
+
         const list = Array.isArray((data as any).questions) ? (data as any).questions : [];
-        questionsGeneratedToday += list.length;
+        const bucket = Math.floor((updatedAt - weekStart) / dayMs);
+        if (bucket >= 0 && bucket < 7) {
+          dailyQuestionCounts[bucket] += list.length;
+        }
       });
-    } catch {
-      // Fallback without indexed query
-      const subjectsSnap = await db.collectionGroup("subjects").get().catch(() => null);
-      if (subjectsSnap) {
-        subjectsSnap.forEach((doc) => {
+    }
+
+    for (let i = 0; i < 7; i += 1) {
+      const dayDate = new Date(weekStart + i * dayMs);
+      questionsByDay.push({
+        day: dayNames[dayDate.getDay()],
+        count: dailyQuestionCounts[i]
+      });
+    }
+
+    questionsGeneratedToday = dailyQuestionCounts[6];
+
+    const scansByClass: { className: string; count: number }[] = [];
+    const classScanCounts: Record<string, number> = {};
+    const weeklyActivity: { day: string; scans: number }[] = [];
+
+    if (resultsSnap) {
+      resultsSnap.docs.forEach((doc) => {
+        const data = doc.data() || {};
+        const createdAt = Number((data as any).createdAt || (data as any).scannedAt || 0);
+        const className = String((data as any).className || (data as any).classId || 'Unknown');
+
+        if (createdAt >= weekStart && createdAt < midnight + dayMs) {
+          const bucket = Math.floor((createdAt - weekStart) / dayMs);
+          if (bucket >= 0 && bucket < 7) {
+            dailyQuestionCounts[bucket] = dailyQuestionCounts[bucket];
+          }
+        }
+
+        classScanCounts[className] = (classScanCounts[className] || 0) + 1;
+      });
+
+      for (let i = 0; i < 7; i += 1) {
+        const dayStart = weekStart + i * dayMs;
+        const dayDate = new Date(dayStart);
+        const dayName = dayNames[dayDate.getDay()];
+        const scansForDay = resultsSnap.docs.reduce((count, doc) => {
           const data = doc.data() || {};
-          const updatedAt = Number((data as any).questionsUpdatedAt);
-          if (!Number.isFinite(updatedAt)) return;
-          if (updatedAt < start || updatedAt >= end) return;
-          const list = Array.isArray((data as any).questions) ? (data as any).questions : [];
-          questionsGeneratedToday += list.length;
-        });
+          const createdAt = Number((data as any).createdAt || (data as any).scannedAt || 0);
+          return count + ((createdAt >= dayStart && createdAt < dayStart + dayMs) ? 1 : 0);
+        }, 0);
+        weeklyActivity.push({ day: dayName, scans: scansForDay });
       }
     }
 
-    // Calculate weekly activity (scans per day for last 7 days)
-    const weeklyActivity: { day: string; scans: number }[] = [];
-    const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-    
-    for (let i = 6; i >= 0; i--) {
-      const dayDate = new Date(now);
-      dayDate.setDate(dayDate.getDate() - i);
-      const dayStart = new Date(dayDate.getFullYear(), dayDate.getMonth(), dayDate.getDate()).getTime();
-      const dayEnd = dayStart + 24 * 60 * 60 * 1000;
-      const dayName = dayNames[dayDate.getDay()];
-      
-      let dayScans = 0;
-      scansSnap.docs.forEach((doc) => {
-        const data = doc.data() || {};
-        const createdAt = Number((data as any).createdAt || (data as any).scannedAt || 0);
-        if (createdAt >= dayStart && createdAt < dayEnd) {
-          dayScans++;
-        }
-      });
-      
-      weeklyActivity.push({ day: dayName, scans: dayScans });
-    }
-
-    // Calculate scans distribution by class
-    const scansByClass: { className: string; count: number }[] = [];
-    const classScanCounts: Record<string, number> = {};
-    
-    scansSnap.docs.forEach((doc) => {
-      const data = doc.data() || {};
-      const className = String((data as any).className || (data as any).classId || 'Unknown');
-      classScanCounts[className] = (classScanCounts[className] || 0) + 1;
-    });
-    
     Object.entries(classScanCounts)
       .sort((a, b) => b[1] - a[1])
       .slice(0, 5)
       .forEach(([className, count]) => {
         scansByClass.push({ className, count });
       });
-    
-    // If no data, add placeholder
+
     if (scansByClass.length === 0) {
       scansByClass.push({ className: 'No Data', count: 0 });
     }
 
-    // Calculate questions generated over the week
-    const questionsByDay: { day: string; count: number }[] = [];
-    
-    for (let i = 6; i >= 0; i--) {
-      const dayDate = new Date(now);
-      dayDate.setDate(dayDate.getDate() - i);
-      const dayStart = new Date(dayDate.getFullYear(), dayDate.getMonth(), dayDate.getDate()).getTime();
-      const dayEnd = dayStart + 24 * 60 * 60 * 1000;
-      const dayName = dayNames[dayDate.getDay()];
-      
-      let dayQuestions = 0;
-      
-      // Get all subjects and count questions updated on this day
-      const subjectsSnap = await db.collectionGroup("subjects").get().catch(() => null);
-      if (subjectsSnap) {
-        subjectsSnap.docs.forEach((doc) => {
-          const data = doc.data() || {};
-          const updatedAt = Number((data as any).questionsUpdatedAt);
-          if (updatedAt >= dayStart && updatedAt < dayEnd) {
-            const list = Array.isArray((data as any).questions) ? (data as any).questions : [];
-            dayQuestions += list.length;
-          }
-        });
-      }
-      
-      questionsByDay.push({ day: dayName, count: dayQuestions });
-    }
+    const responseData = {
+      totalUsers,
+      totalTeachers: teachersCount,
+      totalAdmins: adminsCount,
+      totalClasses,
+      totalScannedPapers,
+      questionsGeneratedToday,
+      weeklyActivity,
+      scansByClass,
+      questionsByDay,
+      computedAt: new Date().toISOString(),
+      responseTimeMs: Date.now() - startedAt
+    };
 
-    return res.json({
-      success: true,
-      data: {
-        totalUsers,
-        totalTeachers: teachersCount,
-        totalAdmins: adminsCount,
-        totalClasses,
-        totalScannedPapers,
-        questionsGeneratedToday,
-        weeklyActivity,
-        scansByClass,
-        questionsByDay,
-        computedAt: new Date().toISOString(),
-        responseTimeMs: Date.now() - startedAt
-      }
-    });
+    await cacheRef.set({
+      cachedUntil: Date.now() + 30_000,
+      payload: responseData
+    }, { merge: true });
+
+    return res.json({ success: true, data: responseData, cached: false });
   } catch (err: any) {
     console.error("api/admin/metrics/dashboard error:", err);
     return res.status(500).json({ success: false, error: "Failed to load dashboard metrics", message: err?.message });
