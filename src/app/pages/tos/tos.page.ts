@@ -8,6 +8,18 @@ import { ActivatedRoute, Router, RouterModule } from '@angular/router';
 import { LocalDataService, ScannedResult, TopicEntry } from '../../services/local-data.service';
 import { AnswerSheetGeneratorPage } from '../answer-sheet-generator/answer-sheet-generator.page';
 import { ClassStudent, TeacherService } from '../../services/teacher.service';
+import Chart from 'chart.js/auto';
+
+interface QuestionResponseBreakdown {
+  question: number;
+  correctAnswer: string | null;
+  responses: Record<
+    'A' | 'B' | 'C' | 'D',
+    Array<{ name: string; rollNumber?: string | null }>
+  >;
+  totalResponses: number;
+  percentages: Record<'A' | 'B' | 'C' | 'D', number>;
+}
 
 @Component({
   selector: 'app-tos',
@@ -17,6 +29,10 @@ import { ClassStudent, TeacherService } from '../../services/teacher.service';
   imports: [CommonModule, FormsModule, IonicModule, AnswerSheetGeneratorPage, RouterModule] 
 })
 export class TosPage implements OnInit {
+  responseChart?: Chart;
+  correctVsIncorrectChart!: Chart;
+  answerDistributionChart!: Chart;
+  questionResponseBreakdown: QuestionResponseBreakdown[] = [];
   classId!: number;
   subjectId!: number;
   className = '';
@@ -226,12 +242,99 @@ export class TosPage implements OnInit {
     });
     return struggling.sort((a, b) => a.percentage - b.percentage);
   }
+  private buildQuestionResponseBreakdown() {
 
-  get questionResponseBreakdown(): Array<{
-    question: number;
+  const questionMap = new Map<number, {
     correctAnswer: string | null;
     responses: Record<'A' | 'B' | 'C' | 'D', Array<{ name: string; rollNumber?: string | null }>>;
-  }> {
+  }>();
+
+  this.subjectResults.forEach(result => {
+
+    result.answers?.forEach(answer => {
+
+      if (answer.question == null) return;
+
+      const question = Number(answer.question);
+
+      const existing = questionMap.get(question) || {
+        correctAnswer: answer.correctAnswer || null,
+        responses: {
+          A: [],
+          B: [],
+          C: [],
+          D: []
+        }
+      };
+
+      if (!existing.correctAnswer && answer.correctAnswer) {
+        existing.correctAnswer = answer.correctAnswer;
+      }
+
+      const option = (answer.marked || '').toUpperCase() as
+        'A' | 'B' | 'C' | 'D';
+
+      if (this.responseOptions.includes(option)) {
+
+        existing.responses[option].push({
+
+          name: result.studentName || `Student ${result.id}`,
+
+          rollNumber: result.rollNumber || null
+
+        });
+
+      }
+
+      questionMap.set(question, existing);
+
+    });
+
+  });
+
+  this.questionResponseBreakdown =
+    Array.from(questionMap.entries())
+      .sort((a, b) => a[0] - b[0])
+      .map(([question, data]) => {
+
+        const totalResponses =
+          Object.values(data.responses)
+            .reduce((sum, arr) => sum + arr.length, 0);
+
+        return {
+
+          question,
+
+          correctAnswer: data.correctAnswer,
+
+          responses: data.responses,
+
+          totalResponses,
+
+          percentages: {
+
+            A: totalResponses ? data.responses.A.length * 100 / totalResponses : 0,
+
+            B: totalResponses ? data.responses.B.length * 100 / totalResponses : 0,
+
+            C: totalResponses ? data.responses.C.length * 100 / totalResponses : 0,
+
+            D: totalResponses ? data.responses.D.length * 100 / totalResponses : 0
+
+          }
+
+        };
+
+      });
+}
+/** 
+    get questionResponseBreakdown(): Array<{
+      question: number;
+      correctAnswer: string | null;
+      responses: Record<'A' | 'B' | 'C' | 'D', Array<{ name: string; rollNumber?: string | null }>>;
+      totalResponses: number;
+      percentages: Record<'A' | 'B' | 'C' | 'D', number>;
+      }> {
     const questionMap = new Map<number, {
       correctAnswer: string | null;
       responses: Record<'A' | 'B' | 'C' | 'D', Array<{ name: string; rollNumber?: string | null }>>;
@@ -263,14 +366,251 @@ export class TosPage implements OnInit {
     });
 
     return Array.from(questionMap.entries())
-      .sort((a, b) => a[0] - b[0])
-      .map(([question, data]) => ({
-        question,
-        correctAnswer: data.correctAnswer,
-        responses: data.responses
-      }));
+  .sort((a, b) => a[0] - b[0])
+  .map(([question, data]) => {
+
+    const totalResponses =
+      Object.values(data.responses)
+        .reduce((sum, arr) => sum + arr.length, 0);
+
+    return {
+      question,
+      correctAnswer: data.correctAnswer,
+      responses: data.responses,
+
+      totalResponses,
+
+      percentages: {
+        A: totalResponses ? (data.responses.A.length / totalResponses) * 100 : 0,
+        B: totalResponses ? (data.responses.B.length / totalResponses) * 100 : 0,
+        C: totalResponses ? (data.responses.C.length / totalResponses) * 100 : 0,
+        D: totalResponses ? (data.responses.D.length / totalResponses) * 100 : 0
+      }
+    };
+
+  });
+  }
+*/
+buildResponseDistributionChart() {
+
+  const stats = this.overallResponseStats;
+
+
+  if (this.responseChart) {
+    this.responseChart.destroy();
   }
 
+
+  const canvas =
+    document.getElementById(
+      'responseDistributionChart'
+    ) as HTMLCanvasElement;
+
+
+  if (!canvas) {
+    console.log('Response chart canvas not ready');
+    return;
+  }
+
+
+  this.responseChart = new Chart(
+    canvas,
+    {
+      type:'bar',
+
+      data:{
+        labels:[
+          'A',
+          'B',
+          'C',
+          'D'
+        ],
+
+        datasets:[
+          {
+            label:'Responses',
+
+            data:[
+              stats.optionCounts.A,
+              stats.optionCounts.B,
+              stats.optionCounts.C,
+              stats.optionCounts.D
+            ]
+          }
+        ]
+      },
+
+      options:{
+        responsive:true,
+
+        plugins:{
+          legend:{
+            display:false
+          }
+        }
+      }
+    }
+  );
+
+}
+get currentStudentResults(): ScannedResult[] {
+
+  if (!this.students || !this.students.length) {
+    return [];
+  }
+
+
+  const matchedResults = this.subjectResults.filter(result => {
+
+    return this.students.some(student => {
+
+      const sid = Number(student.id);
+
+      const roll =
+        String(student.roll_number || '').trim();
+
+      const name =
+        String(student.name || '')
+          .trim()
+          .toLowerCase();
+
+
+      return (
+        Number((result as any).studentId) === sid ||
+        (roll &&
+          String((result as any).rollNumber || '').trim() === roll) ||
+        (name &&
+          String((result as any).studentName || '')
+            .trim()
+            .toLowerCase() === name)
+      );
+
+    });
+
+  });
+
+
+  // Keep only latest attempt per student
+  const latestByStudent = new Map<string, ScannedResult>();
+
+
+  matchedResults.forEach(result => {
+
+    const key =
+      String(
+        result.studentName ||
+        result.rollNumber ||
+        result.studentId
+      )
+      .trim()
+      .toLowerCase();
+
+
+    const existing =
+      latestByStudent.get(key);
+
+
+    if (!existing) {
+
+      latestByStudent.set(key, result);
+
+    } else {
+
+      const oldTime =
+        Date.parse(String(existing.timestamp || ''));
+
+      const newTime =
+        Date.parse(String(result.timestamp || ''));
+
+
+      if (newTime > oldTime) {
+        latestByStudent.set(key, result);
+      }
+
+    }
+
+  });
+
+
+  return Array.from(latestByStudent.values());
+
+}
+get overallResponseStats() {
+
+  let correct = 0;
+  let incorrect = 0;
+
+  const optionCounts: Record<'A'|'B'|'C'|'D', number> = {
+    A:0,
+    B:0,
+    C:0,
+    D:0
+  };
+
+  let totalAnswers = 0;
+
+
+  this.questionResponseBreakdown.forEach(item => {
+
+    const correctAnswer =
+      item.correctAnswer?.toUpperCase();
+
+
+    (['A','B','C','D'] as const)
+    .forEach(option => {
+
+
+      const count =
+        this.getOptionResponses(item, option).length;
+
+
+      optionCounts[option] += count;
+
+      totalAnswers += count;
+
+
+      if(option === correctAnswer){
+
+        correct += count;
+
+      } else {
+
+        incorrect += count;
+
+      }
+
+
+    });
+
+
+  });
+
+
+  return {
+
+    totalAnswers,
+
+    correct,
+
+    incorrect,
+
+    correctPercentage:
+      totalAnswers
+        ? (correct / totalAnswers) * 100
+        : 0,
+
+
+    incorrectPercentage:
+      totalAnswers
+        ? (incorrect / totalAnswers) * 100
+        : 0,
+
+
+    optionCounts
+
+  };
+
+}
   getOptionResponses(
     item: { responses: Record<'A' | 'B' | 'C' | 'D', Array<{ name: string; rollNumber?: string | null }>> },
     option: 'A' | 'B' | 'C' | 'D'
@@ -434,6 +774,9 @@ export class TosPage implements OnInit {
       this.studentSummaryById.clear();
     } finally {
       this.isLoadingStudents = false;
+    }
+    if (this.subjectResults.length) {
+      this.buildQuestionResponseBreakdown();
     }
   }
 
@@ -652,6 +995,7 @@ export class TosPage implements OnInit {
       }
 
       this.subjectResults = Array.from(mergedMap.values());
+      this.buildQuestionResponseBreakdown();
       LocalDataService.setSubjectResults(this.classId, this.subjectId, this.subjectResults);
     } catch (e) {
       console.error('Failed to load scan results for TOS page', e);
@@ -672,6 +1016,13 @@ export class TosPage implements OnInit {
 
   setMode(mode: 'overview' | 'edit' | 'print' | 'answersheet' | 'students' | 'responses') {
     this.viewMode = mode;
+    
+    if(mode === 'responses') {
+
+      setTimeout(() => {
+        this.buildResponseDistributionChart();
+      }, 300);
+    }
 
     // Automatically trigger print when entering print mode
     if (mode === 'print') {

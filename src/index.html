@@ -17,16 +17,38 @@
   <!-- Add to homescreen for iOS -->
   <meta name="mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black" />
+  <!-- OpenCV.js -->
+  <!-- ✅ Correct and single load -->
+      <script src="https://cdn.jsdelivr.net/npm/tesseract.js@2/dist/tesseract.min.js"></script>
 
-  <!-- OpenCV.js for OMR scanner (offline-capable, bundled in assets) -->
-  <script defer src="assets/opencv-bundle/opencv-bundle.js" onload="window.__opencvReady=true;" onerror="console.error('Failed to load OpenCV.js (assets/opencv-bundle/opencv-bundle.js)');"></script>
-  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/tesseract.js@4.0.2/dist/tesseract.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/jscolor@2.0.4/jscolor.min.js"></script>
+      <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+      <script src="https://cdn.jsdelivr.net/npm/tesseract.js@4.0.2/dist/tesseract.min.js"></script>
+      <script src="https://cdn.jsdelivr.net/npm/jscolor@2.0.4/jscolor.min.js"></script>
+      <script>
+      function loadOfflineOpenCV() {
+          const script = document.createElement('script');
+          script.src = 'assets/opencv-bundle/opencv-bundle.js';
+          script.onload = () => {
+              console.log('Offline OpenCV loaded');
+              window.__opencvReady = true;
+          };
+          document.head.appendChild(script);
+      }
+      </script>
 
+      <script
+          src="https://docs.opencv.org/4.5.5/opencv.js"
+          onload="console.log('OpenCV Docs loaded'); window.__opencvReady = true;"
+          onerror="console.log('Docs failed, loading offline'); loadOfflineOpenCV();">
+      </script>
   <!-- PDF.js for reading teacher lesson PDFs on the client -->
   <!-- Note: integrity attribute removed to avoid SRI mismatch blocking the script. -->
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.min.js" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.min.js"
+        crossorigin="anonymous"
+        referrerpolicy="no-referrer"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/tesseract.js@4.0.2/dist/tesseract.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/jscolor@2.0.4/jscolor.min.js"></script>
 
   <!-- Lite OMR Engine Hooks -->
   <script>

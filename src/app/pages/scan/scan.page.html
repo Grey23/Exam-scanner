@@ -49,17 +49,19 @@
 
     <!-- Controls: manual scan + gallery -->
     <div class="controls manual-mode-note">
-      <span>Point the camera at the answer sheet and press SCAN NOW.</span>
+      <!--<span>Point the camera at the answer sheet and press SCAN NOW.</span>-->
       <div style="font-size: 12px; opacity: 0.8; margin-top: 4px;">
         Make sure all 4 corner markers are visible and the sheet fills most of the screen.
       </div>
 
       <!-- Primary manual action -->
+
+       <!---
       <ion-button expand="block" color="primary" class="main-scan-btn" (click)="capture()" [disabled]="isProcessing">
         <ion-icon name="scan" slot="start"></ion-icon>
         SCAN NOW
       </ion-button>
-
+    -->
       <ion-button expand="block" size="small" fill="outline" color="medium" (click)="importFromGallery()">
         <ion-icon name="images" slot="start"></ion-icon>
         Import from Gallery

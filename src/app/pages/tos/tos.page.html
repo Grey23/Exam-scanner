@@ -154,36 +154,116 @@
   </div>
 
   <!-- Responses Tab -->
-  <div *ngIf="viewMode === 'responses'">
-    <ion-card class="participation-card">
-      <ion-card-header>
-        <ion-card-title class="dashboard-title">Student Responses</ion-card-title>
-      </ion-card-header>
-      <ion-card-content>
-        <p class="response-help-text">Each question shows the correct answer and the students who chose A, B, C, or D.</p>
+<div *ngIf="viewMode === 'responses'">
+  <ion-card class="participation-card">
+    <ion-card-header>
+      <ion-card-title class="dashboard-title">Student Responses</ion-card-title>
+    </ion-card-header>
 
-        <div class="response-list" *ngFor="let item of questionResponseBreakdown">
-          <div class="response-question-card">
-            <div class="response-question-title">Question {{ item.question }}</div>
-            <div class="response-correct-answer">Correct answer: {{ item.correctAnswer || '—' }}</div>
+    <ion-card-content>
 
-            <div class="response-group" *ngFor="let option of responseOptions">
-              <div class="response-option-row" (click)="showResponseOptionList(item, option)" style="cursor: pointer;">
-                <span class="response-option-label">{{ option }}</span>
-                <div class="response-student-list">
-                  <span class="response-preview-text">
-                    {{ getOptionResponseLabel(item, option) }}
-                  </span>
-                </div>
-                <span class="response-count-badge">{{ getOptionResponses(item, option).length }}</span>
-                <ion-icon name="chevron-forward-outline" slot="end" style="font-size: 16px; opacity: 0.35;"></ion-icon>
-              </div>
-            </div>
+      <!-- Overall Statistics -->
+      <ion-card class="overall-response-card">
+        <ion-card-header>
+          <ion-card-title>Overall Statistics</ion-card-title>
+        </ion-card-header>
+        <ion-card-content>
+
+          <p><strong>Total Answers:</strong> {{ overallResponseStats.totalAnswers }}</p>
+
+          <p>
+            <strong>Correct:</strong>
+            {{ overallResponseStats.correct }}
+            ({{ overallResponseStats.correctPercentage | number:'1.0-1' }}%)
+          </p>
+
+          <p>
+            <strong>Incorrect:</strong>
+            {{ overallResponseStats.incorrect }}
+            ({{ overallResponseStats.incorrectPercentage | number:'1.0-1' }}%)
+          </p>
+
+          <hr>
+
+          <p><strong>Overall Answer Distribution</strong></p>
+
+          <p>A: {{ overallResponseStats.optionCounts.A }}</p>
+          <p>B: {{ overallResponseStats.optionCounts.B }}</p>
+          <p>C: {{ overallResponseStats.optionCounts.C }}</p>
+          <p>D: {{ overallResponseStats.optionCounts.D }}</p>
+        <hr>
+
+          <h3>Answer Distribution</h3>
+
+          <canvas 
+            id="responseDistributionChart"
+            style="width:100%; height:300px;">
+          </canvas>
+        </ion-card-content>
+      </ion-card>
+
+      <p class="response-help-text">
+        Each question shows the correct answer and the students who chose A, B, C, or D.
+      </p>
+
+      <div class="response-list" *ngFor="let item of questionResponseBreakdown">
+
+        <div class="response-question-card">
+
+          <div class="response-question-title">
+            Question {{ item.question }}
           </div>
+
+          <div class="response-correct-answer">
+            Correct answer: {{ item.correctAnswer || '—' }}
+          </div>
+
+          <div class="response-group" *ngFor="let option of responseOptions">
+
+            <div
+              class="response-option-row"
+              (click)="showResponseOptionList(item, option)"
+              style="cursor:pointer;">
+
+              <span class="response-option-label">
+                {{ option }}
+              </span>
+
+              <div class="response-student-list">
+                <span class="response-preview-text">
+                  {{ getOptionResponseLabel(item, option) }}
+                </span>
+              </div>
+
+              <div class="response-stats">
+
+                <span class="response-count-badge">
+                  {{ getOptionResponses(item, option).length }}
+                </span>
+
+                <span class="response-percent">
+                  {{ item.percentages[option] | number:'1.0-1' }}%
+                </span>
+
+              </div>
+
+              <ion-icon
+                name="chevron-forward-outline"
+                slot="end"
+                style="font-size:16px;opacity:.35;">
+              </ion-icon>
+
+            </div>
+
+          </div>
+
         </div>
-      </ion-card-content>
-    </ion-card>
-  </div>
+
+      </div>
+
+    </ion-card-content>
+  </ion-card>
+</div>
 
   <!-- Edit Mode -->
   <div *ngIf="viewMode === 'edit'">
