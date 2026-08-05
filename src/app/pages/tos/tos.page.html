@@ -201,7 +201,55 @@
           </canvas>
         </ion-card-content>
       </ion-card>
+<ion-card>
+  <ion-card-header>
+    <ion-card-title>Item Analysis (Test)</ion-card-title>
+  </ion-card-header>
 
+  <ion-card-content>
+
+    <ion-grid>
+
+      <ion-row class="ion-text-center">
+        <ion-col><strong>#</strong></ion-col>
+        <ion-col><strong>Ans</strong></ion-col>
+        <ion-col><strong># Correct</strong></ion-col>
+        <ion-col><strong>%</strong></ion-col>
+        <ion-col><strong>A</strong></ion-col>
+        <ion-col><strong>B</strong></ion-col>
+        <ion-col><strong>C</strong></ion-col>
+        <ion-col><strong>D</strong></ion-col>
+        <ion-col><strong>Blank</strong></ion-col>
+      </ion-row>
+
+      <ion-row
+        *ngFor="let item of itemAnalysis"
+        class="ion-text-center">
+
+        <ion-col>{{ item.question }}</ion-col>
+
+        <ion-col>{{ item.correctAnswer }}</ion-col>
+
+        <ion-col>{{ item.correctCount }}</ion-col>
+
+        <ion-col>{{ item.percentCorrect }}%</ion-col>
+
+        <ion-col>{{ item.counts.A }}</ion-col>
+
+        <ion-col>{{ item.counts.B }}</ion-col>
+
+        <ion-col>{{ item.counts.C }}</ion-col>
+
+        <ion-col>{{ item.counts.D }}</ion-col>
+
+        <ion-col>{{ item.counts.Blank }}</ion-col>
+
+      </ion-row>
+
+    </ion-grid>
+
+  </ion-card-content>
+</ion-card>
       <p class="response-help-text">
         Each question shows the correct answer and the students who chose A, B, C, or D.
       </p>

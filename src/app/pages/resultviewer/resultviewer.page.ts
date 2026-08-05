@@ -27,6 +27,28 @@ interface TosRowAnalysis {
   total: number;
   percentScore: number;
 }
+interface ItemAnalysis {
+  question: number;
+  correctAnswer: string | null;
+
+  totalResponses: number;
+  correctCount: number;
+  percentCorrect: number;
+
+  counts: {
+    A: number;
+    B: number;
+    C: number;
+    D: number;
+    Blank: number;
+  };
+
+  alternativeAnswers: {
+    option: string;
+    count: number;
+    percent: number;
+  }[];
+}
 
 @Component({
   selector: 'app-resultviewer',
@@ -561,7 +583,123 @@ export class ResultviewerPage implements OnInit, AfterViewInit, OnDestroy {
         responses: data.responses
       }));
   }
+get itemAnalysis(): ItemAnalysis[] {
 
+  const results = this.allResults || [];
+
+  if (!results.length) {
+    return [];
+  }
+
+  const questionMap = new Map<number, ItemAnalysis>();
+
+  for (const result of results) {
+
+    for (const answer of result.answers || []) {
+
+      const question = Number(answer.question);
+
+      if (!questionMap.has(question)) {
+
+        questionMap.set(question, {
+
+          question,
+
+          correctAnswer: answer.correctAnswer,
+
+          totalResponses: 0,
+
+          correctCount: 0,
+
+          percentCorrect: 0,
+
+          counts: {
+            A: 0,
+            B: 0,
+            C: 0,
+            D: 0,
+            Blank: 0
+          },
+
+          alternativeAnswers: []
+
+        });
+
+      }
+
+      const item = questionMap.get(question)!;
+
+      item.totalResponses++;
+
+      const marked = (answer.marked || '').toUpperCase();
+
+      switch (marked) {
+
+        case 'A':
+          item.counts.A++;
+          break;
+
+        case 'B':
+          item.counts.B++;
+          break;
+
+        case 'C':
+          item.counts.C++;
+          break;
+
+        case 'D':
+          item.counts.D++;
+          break;
+
+        default:
+          item.counts.Blank++;
+      }
+
+      if (answer.correct) {
+        item.correctCount++;
+      }
+
+    }
+
+  }
+
+  const analysis = Array.from(questionMap.values())
+    .sort((a, b) => a.question - b.question);
+
+  analysis.forEach(item => {
+
+    item.percentCorrect =
+      item.totalResponses
+        ? Math.round((item.correctCount / item.totalResponses) * 100)
+        : 0;
+
+    item.alternativeAnswers = ['A', 'B', 'C', 'D']
+      .filter(option => option !== item.correctAnswer)
+      .map(option => {
+
+        const count = item.counts[option as 'A' | 'B' | 'C' | 'D'];
+
+        return {
+
+          option,
+
+          count,
+
+          percent: item.totalResponses
+            ? Math.round((count / item.totalResponses) * 100)
+            : 0
+
+        };
+
+      })
+      .filter(x => x.count > 0)
+      .sort((a, b) => b.count - a.count);
+
+  });
+
+  return analysis;
+
+}
   /** Get accuracy percentage for the current result */
   getAccuracyPercentage(): number {
     if (!this.result || this.result.total === 0) return 0;

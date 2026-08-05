@@ -373,124 +373,140 @@
           </ion-card-content>
         </ion-card>
       </div>
+<!-- Responses Tab Content -->
+<div *ngSwitchCase="'responses'">
 
-      <!-- Responses Tab Content -->
-      <div *ngSwitchCase="'responses'">
-        <ion-card class="review-summary-card">
-          <ion-card-header>
-            <div class="card-header-row">
-              <ion-card-title>🧾 Student Responses</ion-card-title>
-              <ion-button fill="clear" size="small" (click)="showHelp('statistics')">
-                <ion-icon name="help-circle-outline"></ion-icon>
-              </ion-button>
-            </div>
-            <ion-card-subtitle>Correct answer and which students chose each option</ion-card-subtitle>
-          </ion-card-header>
-          <ion-card-content>
-            <p class="review-helper-text">Each question shows the correct answer and the students who selected A, B, C, or D.</p>
-          </ion-card-content>
-        </ion-card>
+  <!-- Summary -->
+  <ion-card class="review-summary-card">
+    <ion-card-header>
+      <div class="card-header-row">
+        <ion-card-title>🧾 Student Responses</ion-card-title>
+        <ion-button fill="clear" size="small" (click)="showHelp('statistics')">
+          <ion-icon name="help-circle-outline"></ion-icon>
+        </ion-button>
+      </div>
+      <ion-card-subtitle>
+        Correct answer and which students chose each option
+      </ion-card-subtitle>
+    </ion-card-header>
 
-        <ion-card class="review-card" *ngFor="let item of questionResponseBreakdown">
-          <ion-card-header>
-            <ion-card-title>Question {{ item.question }}</ion-card-title>
-            <ion-card-subtitle>Correct answer: {{ item.correctAnswer || '—' }}</ion-card-subtitle>
-          </ion-card-header>
-          <ion-card-content>
-            <div class="response-group" *ngFor="let option of responseOptions">
-              <div class="response-option-row">
-                <span class="response-option-label">{{ option }}</span>
-                <div class="response-student-list">
-                  <span *ngIf="item.responses[option].length; else noResponses">
-                    <span class="response-student" *ngFor="let student of item.responses[option]; let last = last">
-                      {{ student.name }}<span *ngIf="student.rollNumber"> ({{ student.rollNumber }})</span><span *ngIf="!last">, </span>
-                    </span>
-                  </span>
-                  <ng-template #noResponses>
-                    <span class="response-none">No responses</span>
-                  </ng-template>
-                </div>
-              </div>
-            </div>
-          </ion-card-content>
-        </ion-card>
+    <ion-card-content>
+      <p class="review-helper-text">
+        Each question shows the correct answer and the students who selected A, B, C, or D.
+      </p>
+    </ion-card-content>
+  </ion-card>
+
+  <!-- ZIPGRADE TEST TABLE -->
+  <ion-card>
+
+    <ion-card-header>
+      <ion-card-title>Item Analysis (Test)</ion-card-title>
+    </ion-card-header>
+
+    <ion-card-content>
+
+      <p>Total Questions: {{ itemAnalysis.length }}</p>
+
+      <ion-grid>
+
+        <ion-row class="ion-text-center">
+          <ion-col>#</ion-col>
+          <ion-col>Ans</ion-col>
+          <ion-col>Correct</ion-col>
+          <ion-col>%</ion-col>
+          <ion-col>A</ion-col>
+          <ion-col>B</ion-col>
+          <ion-col>C</ion-col>
+          <ion-col>D</ion-col>
+          <ion-col>Blank</ion-col>
+        </ion-row>
+
+        <ion-row
+          *ngFor="let item of itemAnalysis"
+          class="ion-text-center">
+
+          <ion-col>{{ item.question }}</ion-col>
+          <ion-col>{{ item.correctAnswer }}</ion-col>
+          <ion-col>{{ item.correctCount }}</ion-col>
+          <ion-col>{{ item.percentCorrect }}%</ion-col>
+          <ion-col>{{ item.counts.A }}</ion-col>
+          <ion-col>{{ item.counts.B }}</ion-col>
+          <ion-col>{{ item.counts.C }}</ion-col>
+          <ion-col>{{ item.counts.D }}</ion-col>
+          <ion-col>{{ item.counts.Blank }}</ion-col>
+
+        </ion-row>
+
+      </ion-grid>
+
+    </ion-card-content>
+
+  </ion-card>
+
+  <!-- Existing Student Response Cards -->
+
+  <ion-card
+    class="review-card"
+    *ngFor="let item of questionResponseBreakdown">
+
+    <ion-card-header>
+      <ion-card-title>
+        Question {{ item.question }}
+      </ion-card-title>
+
+      <ion-card-subtitle>
+        Correct answer: {{ item.correctAnswer || '—' }}
+      </ion-card-subtitle>
+
+    </ion-card-header>
+
+    <ion-card-content>
+
+      <div
+        class="response-group"
+        *ngFor="let option of responseOptions">
+
+        <div class="response-option-row">
+
+          <span class="response-option-label">
+            {{ option }}
+          </span>
+
+          <div class="response-student-list">
+
+            <span
+              *ngIf="item.responses[option].length; else noResponses">
+
+              <span
+                class="response-student"
+                *ngFor="let student of item.responses[option]; let last = last">
+
+                {{ student.name }}
+                <span *ngIf="student.rollNumber">
+                  ({{ student.rollNumber }})
+                </span>
+
+                <span *ngIf="!last">, </span>
+
+              </span>
+
+            </span>
+
+            <ng-template #noResponses>
+              <span class="response-none">
+                No responses
+              </span>
+            </ng-template>
+
+          </div>
+
+        </div>
+
       </div>
 
-      <!-- Statistics Tab Content -->
-      <div *ngSwitchCase="'statistics'">
-        <ion-card class="statistics-card">
-          <ion-card-header>
-            <div class="card-header-row">
-              <ion-card-title>📊 Answer Analysis</ion-card-title>
-              <ion-button fill="clear" size="small" (click)="showHelp('statistics')">
-                <ion-icon name="help-circle-outline"></ion-icon>
-              </ion-button>
-            </div>
-            <ion-card-subtitle>Question-by-question breakdown</ion-card-subtitle>
-          </ion-card-header>
-          <ion-card-content>
-            <div class="statistics-grid">
-              <div class="stat-item">
-                <div class="stat-label">✅ Correct Answers</div>
-                <div class="stat-values">
-                  <span class="stat-value">{{ result?.score ?? 0 }}</span>
-                  <span class="stat-sep">/</span>
-                  <span class="stat-value">{{ result?.total ?? 0 }}</span>
-                </div>
-              </div>
+    </ion-card-content>
 
-              <div class="stat-item">
-                <div class="stat-label">❌ Incorrect Answers</div>
-                <div class="stat-values">
-                  <span class="stat-value">{{ getIncorrectCount() }}</span>
-                  <span class="stat-sep">/</span>
-                  <span class="stat-value">{{ result?.total ?? 0 }}</span>
-                </div>
-              </div>
+  </ion-card>
 
-              <div class="stat-item">
-                <div class="stat-label">📊 Accuracy</div>
-                <div class="stat-values">
-                  <span class="stat-value">{{ getAccuracyPercentage() }}%</span>
-                </div>
-              </div>
-
-              <div class="stat-item">
-                <div class="stat-label">🎯 Mean Percentage</div>
-                <div class="stat-values">
-                  <span class="stat-value">{{ meanPercentage | number:'1.0-0' }}%</span>
-                </div>
-              </div>
-            </div>
-
-            <div class="statistics-legend">
-              <small>Based on this student's scanned paper</small>
-            </div>
-          </ion-card-content>
-        </ion-card>
-
-        <ion-card class="answer-distribution-card" *ngIf="result?.answers">
-          <ion-card-header>
-            <ion-card-title>� Answer Distribution</ion-card-title>
-            <ion-card-subtitle>Selections per option (A, B, C, D)</ion-card-subtitle>
-          </ion-card-header>
-          <ion-card-content>
-            <div class="answer-distribution">
-              <div class="distribution-item" *ngFor="let option of ['A', 'B', 'C', 'D']">
-                <span class="option-label">{{ option }}</span>
-                <div class="option-bar">
-                  <div class="option-fill" [style.width.%]="getAnswerDistribution(option)"></div>
-                </div>
-                <span class="option-count">{{ getAnswerDistribution(option) }}%</span>
-              </div>
-            </div>
-          </ion-card-content>
-        </ion-card>
-      </div>
-    </div>
-  </div>
-
-  <div *ngIf="!result">
-    <p>Result not found.</p>
-  </div>
-</ion-content>
+</div>

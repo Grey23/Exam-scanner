@@ -1280,7 +1280,17 @@ onStartCameraButtonClick() {
 
       cv.cvtColor(src, gray, cv.COLOR_BGR2GRAY);
       cv.GaussianBlur(gray, blurred, new cv.Size(5, 5), 0);
-      cv.threshold(blurred, edges, 60, 255, cv.THRESH_BINARY_INV);
+
+      cv.adaptiveThreshold(
+          blurred,
+          edges,
+          255,
+          cv.ADAPTIVE_THRESH_GAUSSIAN_C,
+          cv.THRESH_BINARY_INV,
+          31,
+          10
+      );
+      //cv.threshold(blurred, edges, 60, 255, cv.THRESH_BINARY_INV);
       cv.findContours(edges, contours, hierarchy, cv.RETR_EXTERNAL, cv.CHAIN_APPROX_SIMPLE);
 
       if (!this.detectionBoxes || this.detectionBoxes.length === 0) {
@@ -1372,7 +1382,7 @@ onStartCameraButtonClick() {
   //<ScannedResult | null>
    {
   const log = (...args: any[]) => console.log("[detectAndCropPaper]", ...args);
-    alert("Entered detectAndCropPaper");
+    //alert("Entered detectAndCropPaper");
   try {
     //this.presentAlert("Scan Step", "Init started");
     const canvas = this.canvasRef?.nativeElement;
@@ -1385,11 +1395,11 @@ onStartCameraButtonClick() {
     const gray = new cv.Mat();
     cv.cvtColor(src, gray, cv.COLOR_RGBA2GRAY);
         // 🔥 FIX 1: Light normalization (works for bright & dark rooms)
-    const norm = new cv.Mat();
-    cv.normalize(gray, norm, 0, 255, cv.NORM_MINMAX);
+    //const norm = new cv.Mat();
+    //cv.normalize(gray, norm, 0, 255, cv.NORM_MINMAX);
         // ✅ ADD THIS HERE
     //cv.medianBlur(norm, norm, 5);
-    cv.GaussianBlur(norm, norm, new cv.Size(5, 5), 0);
+    cv.GaussianBlur(gray, gray, new cv.Size(5, 5), 0);
     //alert("✅ Canvas read + grayscale + blur applied");
 
     const markerCorners: { x: number; y: number }[] = [];
@@ -1403,23 +1413,41 @@ onStartCameraButtonClick() {
     for (const [boxIndex, box] of this.detectionBoxes.entries()) {
       //alert("3a");
       //alert(`🔍 Processing detectionBox ${boxIndex + 1}`);
-      //const roi = gray.roi(new cv.Rect(box.x, box.y, box.width, box.height));
-      const roi = norm.roi(new cv.Rect(box.x, box.y, box.width, box.height));
+      const roi = gray.roi(new cv.Rect(box.x, box.y, box.width, box.height));
+      //const roi = norm.roi(new cv.Rect(box.x, box.y, box.width, box.height));
       const roiContours = new cv.MatVector();
       const roiHierarchy = new cv.Mat();
-      const thresh = new cv.Mat();
+      const edges = new cv.Mat();
       //alert("3b");
-      cv.adaptiveThreshold(
-        roi,
-        thresh,
-        255,
-        cv.ADAPTIVE_THRESH_MEAN_C,
-        cv.THRESH_BINARY_INV,
-        45,
-        0
+      //cv.adaptiveThreshold( roi,thresh, 255, cv.ADAPTIVE_THRESH_MEAN_C, cv.THRESH_BINARY_INV,45,0);
+
+      const blurred = new cv.Mat();
+      const thresh = new cv.Mat();
+
+      cv.GaussianBlur(
+          roi,
+          blurred,
+          new cv.Size(5,5),
+          0
       );
-      //alert("3c");
-      cv.findContours(thresh, roiContours, roiHierarchy, cv.RETR_EXTERNAL, cv.CHAIN_APPROX_SIMPLE);
+
+      cv.adaptiveThreshold(
+          blurred,
+          thresh,
+          255,
+          cv.ADAPTIVE_THRESH_GAUSSIAN_C,
+          cv.THRESH_BINARY_INV,
+          31,
+          10
+      );
+
+      cv.findContours(
+          thresh,
+          roiContours,
+          roiHierarchy,
+          cv.RETR_EXTERNAL,
+          cv.CHAIN_APPROX_SIMPLE
+      );
       //alert("3d");
       //cv.threshold(roi, roi, 90, 255, cv.THRESH_BINARY_INV);
       //cv.findContours(roi, roiContours, roiHierarchy, cv.RETR_EXTERNAL, cv.CHAIN_APPROX_SIMPLE);
@@ -1435,6 +1463,11 @@ onStartCameraButtonClick() {
         //alert("7");
         cv.approxPolyDP(cnt, approx, 0.02 * cv.arcLength(cnt, true), true);
         //alert("8");
+        console.log(
+            `Box ${boxIndex + 1}`,
+            "Area:", cv.contourArea(cnt),
+            "Vertices:", approx.rows
+        );
         if (approx.rows >= 4 && approx.rows <= 6 && cv.isContourConvex(approx)) {
 
             const rect = cv.boundingRect(approx);
@@ -1497,7 +1530,7 @@ onStartCameraButtonClick() {
       thresh.delete();
     }
     gray.delete();
-    norm.delete();
+    //norm.delete();
     if (markerCorners.length !== 4) throw new Error("Expected 4 corners, got " + markerCorners.length);
     alert("✅ Found 4 corners, ordering...");
     const sum = markerCorners.map(p => p.x + p.y);
@@ -1637,14 +1670,15 @@ onStartCameraButtonClick() {
   } catch (err: any) {
   console.error("detectAndCropPaper error:", err);
 
-  const msg =
-    err?.message ||
-    err?.toString() ||
-    JSON.stringify(err) ||
-    "Unknown error";
+  alert(
+    "Type: " + typeof err +
+    "\nConstructor: " + (err?.constructor?.name ?? "unknown") +
+    "\nName: " + (err?.name ?? "none") +
+    "\nMessage: " + (err?.message ?? "none") +
+    "\nValue: " + String(err)
+  );
 
-  this.presentAlert("Error", "detectAndCropPaper failed: " + msg);
-  alert("❌ detectAndCropPaper failed: " + msg);
+  console.log("Full error object:", err);
 
   return;
 }
@@ -1830,20 +1864,29 @@ async processSheet(
 
       const patch = this.latestWarpedMat.roi(new cv.Rect(x, y, w, h));
       const gray = toGray(patch);
-
+      const norm = new cv.Mat();
+      cv.normalize(gray, norm, 0, 255, cv.NORM_MINMAX);
       const mean = cv.mean(gray)[0];
       means[opt] = mean; // 🔥 YOU MISSED THIS
-      if (mean > 190) {
+      
+      if (mean > 205) {
         ratios[opt] = 0;
           patch.delete(); 
           gray.delete();
         continue;
       }
-
+      
       // 🔥 boost contrast
       //cv.equalizeHist(gray, gray);
 
       // 🔥 slight blur (not too strong)
+      const blurred = new cv.Mat();
+      //cv.GaussianBlur(gray, gray, new cv.Size(5,5), 0);
+      //const edges = new cv.Mat();
+      //cv.threshold(gray, bin, 0, 255, cv.THRESH_BINARY_INV | cv.THRESH_OTSU);
+      //cv.GaussianBlur(gray, gray, new cv.Size(5,5), 0);
+      // Improve local contrast
+      //cv.equalizeHist(gray, gray);
       cv.GaussianBlur(gray, gray, new cv.Size(5, 5), 0);
       const bin = new cv.Mat();
       cv.threshold(gray, bin, 0, 255, cv.THRESH_BINARY_INV | cv.THRESH_OTSU);
@@ -1869,13 +1912,13 @@ async processSheet(
       const nonZero = cv.countNonZero(masked);
       if (nonZero < 8) {
         ratios[opt] = 0;
-        patch.delete(); gray.delete(); bin.delete(); mask.delete(); masked.delete();
+        patch.delete(); gray.delete(); bin.delete(); mask.delete(); masked.delete(); norm.delete(); blurred.delete();
         continue;
       }
       const totalPixels = Math.PI * rx * rx;
       ratios[opt] = nonZero / totalPixels;
 
-      patch.delete(); gray.delete(); bin.delete(); mask.delete(); masked.delete();
+      patch.delete(); gray.delete(); bin.delete(); mask.delete(); masked.delete(); norm.delete(); blurred.delete();
     }
 
     // 🔹 Detect marked answer
@@ -1902,7 +1945,7 @@ async processSheet(
     if (
       bestRatio < MIN_DETECT ||
       (bestRatio - secondBest) < MIN_GAP ||
-      bestMean > 190 // 🔥 shadow filter
+      bestMean > 205 // 🔥 shadow filter
     ) {
       selected = null;
     }
