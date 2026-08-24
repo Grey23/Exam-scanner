@@ -1,4 +1,4 @@
-import { Component, ElementRef, Input, OnInit, ViewChild, OnDestroy } from '@angular/core';
+import { Component, ElementRef, Input, OnInit, ViewChild } from '@angular/core';
 import { NavController } from '@ionic/angular';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
@@ -64,22 +64,7 @@ interface ItemAnalysis {
   standalone: true,
   imports: [CommonModule, FormsModule, IonicModule, AnswerSheetGeneratorPage, RouterModule] 
 })
-export class TosPage implements OnInit, OnDestroy {
-overallResponseStats = {
-  totalAnswers: 0,
-  correct: 0,
-  incorrect: 0,
-  correctPercentage: 0,
-  incorrectPercentage: 0,
-  optionCounts: {
-    A: 0,
-    B: 0,
-    C: 0,
-    D: 0
-  }
-};
-  
-  itemAnalysisData: ItemAnalysis[] = [];
+export class TosPage implements OnInit {
   responseChart?: Chart;
   correctVsIncorrectChart!: Chart;
   answerDistributionChart!: Chart;
@@ -119,25 +104,6 @@ overallResponseStats = {
   // For tracking student performance data (used for filtering)
   private studentPerformanceMap = new Map<number, { name: string; rollNumber?: string; percentage: number }>();
   private scannedStudentIds = new Set<number>();
-
-selectedStudentTopicBreakdown: {
-  topic: string;
-  competency: string;
-  level: string;
-  correct: number;
-  total: number;
-  percent: number;
-}[] = [];
-
-strongestStudentTopics: {
-  topic: string;
-  percent: number;
-}[] = [];
-
-weakestStudentTopics: {
-  topic: string;
-  percent: number;
-}[] = [];
 
   getTotal(field: keyof TopicEntry): number {
   return this.tos.reduce((sum, topic) => sum + (Number(topic[field]) || 0), 0);
@@ -461,60 +427,67 @@ weakestStudentTopics: {
   });
   }
 */
-
-private destroyResponseChart() {
-  if (this.responseChart) {
-  this.responseChart.destroy();
-  this.responseChart = undefined;
-  }
-}
 buildResponseDistributionChart() {
+
   const stats = this.overallResponseStats;
+
 
   if (this.responseChart) {
     this.responseChart.destroy();
-    this.responseChart = undefined;
   }
 
-  const canvas = document.getElementById(
-    'responseDistributionChart'
-  ) as HTMLCanvasElement;
+
+  const canvas =
+    document.getElementById(
+      'responseDistributionChart'
+    ) as HTMLCanvasElement;
+
 
   if (!canvas) {
     console.log('Response chart canvas not ready');
     return;
   }
 
-  this.responseChart = new Chart(canvas, {
-    type: 'bar',
 
-    data: {
-      labels: ['A', 'B', 'C', 'D'],
+  this.responseChart = new Chart(
+    canvas,
+    {
+      type:'bar',
 
-      datasets: [
-        {
-          label: 'Responses',
+      data:{
+        labels:[
+          'A',
+          'B',
+          'C',
+          'D'
+        ],
 
-          data: [
-            stats.optionCounts.A,
-            stats.optionCounts.B,
-            stats.optionCounts.C,
-            stats.optionCounts.D
-          ]
-        }
-      ]
-    },
+        datasets:[
+          {
+            label:'Responses',
 
-    options: {
-      responsive: true,
+            data:[
+              stats.optionCounts.A,
+              stats.optionCounts.B,
+              stats.optionCounts.C,
+              stats.optionCounts.D
+            ]
+          }
+        ]
+      },
 
-      plugins: {
-        legend: {
-          display: false
+      options:{
+        responsive:true,
+
+        plugins:{
+          legend:{
+            display:false
+          }
         }
       }
     }
-  });
+  );
+
 }
 get currentStudentResults(): ScannedResult[] {
 
@@ -598,68 +571,81 @@ get currentStudentResults(): ScannedResult[] {
   return Array.from(latestByStudent.values());
 
 }
-ngOnDestroy() {
-  console.log('TosPage destroyed');
-
-  if (this.responseChart) {
-    this.responseChart.destroy();
-    this.responseChart = undefined;
-  }
-}
-private buildOverallResponseStats(): void {
+get overallResponseStats() {
 
   let correct = 0;
   let incorrect = 0;
 
-  const optionCounts: Record<'A' | 'B' | 'C' | 'D', number> = {
-    A: 0,
-    B: 0,
-    C: 0,
-    D: 0
+  const optionCounts: Record<'A'|'B'|'C'|'D', number> = {
+    A:0,
+    B:0,
+    C:0,
+    D:0
   };
 
   let totalAnswers = 0;
+
 
   this.questionResponseBreakdown.forEach(item => {
 
     const correctAnswer =
       item.correctAnswer?.toUpperCase();
 
-    (['A', 'B', 'C', 'D'] as const).forEach(option => {
+
+    (['A','B','C','D'] as const)
+    .forEach(option => {
+
 
       const count =
         this.getOptionResponses(item, option).length;
 
+
       optionCounts[option] += count;
+
       totalAnswers += count;
 
-      if (option === correctAnswer) {
+
+      if(option === correctAnswer){
+
         correct += count;
+
       } else {
+
         incorrect += count;
+
       }
+
 
     });
 
+
   });
 
-  this.overallResponseStats = {
+
+  return {
+
     totalAnswers,
+
     correct,
+
     incorrect,
 
     correctPercentage:
-      totalAnswers > 0
+      totalAnswers
         ? (correct / totalAnswers) * 100
         : 0,
 
+
     incorrectPercentage:
-      totalAnswers > 0
+      totalAnswers
         ? (incorrect / totalAnswers) * 100
         : 0,
 
+
     optionCounts
+
   };
+
 }
   getOptionResponses(
     item: { responses: Record<'A' | 'B' | 'C' | 'D', Array<{ name: string; rollNumber?: string | null }>> },
@@ -827,16 +813,12 @@ private buildOverallResponseStats(): void {
     }
     if (this.subjectResults.length) {
       this.buildQuestionResponseBreakdown();
-      this.buildQuestionResponseBreakdown();
-      this.buildItemAnalysis();
     }
   }
 
   selectStudent(studentId: number) {
-  this.selectedStudentId = studentId;
-
-  this.updateSelectedStudentTopicAnalysis();
-}
+    this.selectedStudentId = studentId;
+  }
 
   getSelectedStudent(): ClassStudent | undefined {
     if (!this.selectedStudentId) return undefined;
@@ -847,7 +829,7 @@ private buildOverallResponseStats(): void {
     if (!this.selectedStudentId) return undefined;
     return this.studentSummaryById.get(this.selectedStudentId);
   }
-/*
+
   getSelectedStudentTopicBreakdown(): { topic: string; competency: string; level: string; correct: number; total: number; percent: number }[] {
     const s = this.getSelectedStudent();
     if (!s) return [];
@@ -871,7 +853,7 @@ private buildOverallResponseStats(): void {
       .slice(0, 5)
       .map(r => ({ topic: r.topic, percent: r.percent }));
   }
-*/
+
   getStudentLatestLabel(studentId: number): string {
     const s = this.studentSummaryById.get(studentId);
     const r = s?.latest;
@@ -912,43 +894,7 @@ private buildOverallResponseStats(): void {
   collapseAllTopics() {
     this.expandedTopicIndexes.clear();
   }
-private updateSelectedStudentTopicAnalysis() {
-  const student = this.getSelectedStudent();
 
-  if (!student) {
-    this.selectedStudentTopicBreakdown = [];
-    this.strongestStudentTopics = [];
-    this.weakestStudentTopics = [];
-    return;
-  }
-
-  const rows = LocalDataService.getStudentTopicBreakdown(
-    this.classId,
-    this.subjectId,
-    student.id,
-    student.roll_number
-  );
-
-  this.selectedStudentTopicBreakdown = rows;
-
-  this.strongestStudentTopics = rows
-    .filter(r => r.total >= 2)
-    .sort((a, b) => b.percent - a.percent)
-    .slice(0, 5)
-    .map(r => ({
-      topic: r.topic,
-      percent: r.percent
-    }));
-
-  this.weakestStudentTopics = rows
-    .filter(r => r.total >= 2)
-    .sort((a, b) => a.percent - b.percent)
-    .slice(0, 5)
-    .map(r => ({
-      topic: r.topic,
-      percent: r.percent
-    }));
-}
   async deleteTopic(index: number) {
     if (!Number.isFinite(index) || index < 0 || index >= (this.tos?.length || 0)) return;
 
@@ -1094,9 +1040,7 @@ private updateSelectedStudentTopicAnalysis() {
 
     if (this.students && this.students.length) {
       this.recomputeStudentSummaries();
-      
     }
-    this.buildItemAnalysis();
   }
 
   // Re-run result refresh whenever we come back to this page (e.g. after scanning),
@@ -1105,61 +1049,27 @@ private updateSelectedStudentTopicAnalysis() {
     if (!this.classId || !this.subjectId) return;
     await this.refreshResultsForStudents();
   }
-private responseChartTimer: ReturnType<typeof setTimeout> | null = null;
-setMode(
-  mode: 'overview' | 'edit' | 'print' | 'answersheet' | 'students' | 'responses'
-) {
-  console.log('1 - setMode called:', mode);
 
-  // Leaving Responses
-  if (this.viewMode === 'responses' && mode !== 'responses') {
-    console.log('Destroying response chart');
-    this.destroyResponseChart();
-  }
+  setMode(mode: 'overview' | 'edit' | 'print' | 'answersheet' | 'students' | 'responses') {
+    this.viewMode = mode;
+    
+    if(mode === 'responses') {
 
-  this.viewMode = mode;
-
-  console.log('2 - viewMode changed:', this.viewMode);
-
-  if (mode === 'responses') {
-    console.log('3 - scheduling response chart');
-
-    if (this.responseChartTimer) {
-      clearTimeout(this.responseChartTimer);
+      setTimeout(() => {
+        this.buildResponseDistributionChart();
+      }, 300);
     }
 
-    this.responseChartTimer = setTimeout(() => {
-
-      if (this.viewMode !== 'responses') {
-        console.log('Response tab already left - skipping chart');
-        return;
-      }
-
-      console.log('4 - response chart timer fired');
-
-      this.buildResponseDistributionChart();
-
-      console.log('6 - response chart finished');
-
-      this.responseChartTimer = null;
-
-    }, 300);
-  }
-
-  if (mode === 'print') {
-    setTimeout(() => {
-      if (this.viewMode === 'print') {
+    // Automatically trigger print when entering print mode
+    if (mode === 'print') {
+      setTimeout(() => {
         window.print();
-      }
-    }, 300);
+      }, 300);
+    }
+
+    setTimeout(() => this.scrollActiveSegmentIntoView(), 50);
   }
 
-  setTimeout(() => {
-    this.scrollActiveSegmentIntoView();
-  }, 50);
-
-  console.log('7 - setMode finished');
-}
   onModeChange(mode: 'overview' | 'edit' | 'print' | 'answersheet' | 'students' | 'responses') {
     this.setMode(mode);
   }
@@ -1445,14 +1355,12 @@ setMode(
     return { question, choices, answer };
   }
 
-private buildItemAnalysis(): void {
+get itemAnalysis(): ItemAnalysis[] {
 
   const results = this.currentStudentResults || [];
 
-  
   if (!results.length) {
-    this.itemAnalysisData = [];
-    return;
+    return [];
   }
 
   const questionMap = new Map<number, ItemAnalysis>();
@@ -1561,7 +1469,7 @@ private buildItemAnalysis(): void {
 
   });
 
-  this.itemAnalysisData = analysis;
+  return analysis;
 
 }
   private buildTemplateQuestion(

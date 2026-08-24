@@ -479,98 +479,215 @@ export class QuestionGeneratorPage implements OnInit {
 
     this.refreshDisplayQuestions();
   }
+async printQuestions() {
+  const list = (this.displayQuestions || []).filter(
+    (q) => String(q?.question || '').trim()
+  );
 
-  async printQuestions() {
-    const list = (this.displayQuestions || []).filter((q) => String(q?.question || '').trim());
-    if (!list.length) {
-      await this.presentAlert('No generated questions to print.');
-      return;
-    }
+  if (!list.length) {
+    await this.presentAlert('No generated questions to print.');
+    return;
+  }
 
-    const escapeHtml = (s: any) => String(s ?? '')
+  const escapeHtml = (s: any) =>
+    String(s ?? '')
       .replace(/&/g, '&amp;')
       .replace(/</g, '&lt;')
       .replace(/>/g, '&gt;')
       .replace(/"/g, '&quot;')
       .replace(/'/g, '&#39;');
 
-    const rows = list.map((q, idx) => {
-      const topic = escapeHtml(q.topic);
-      const level = escapeHtml(q.level);
-      const competency = q.competency && !/^\d+$/.test(String(q.competency)) ? escapeHtml(q.competency) : '';
-      const question = escapeHtml(q.question);
-      const A = escapeHtml(q.choices?.A);
-      const B = escapeHtml(q.choices?.B);
-      const C = escapeHtml(q.choices?.C);
-      const D = escapeHtml(q.choices?.D);
+  const questionsHtml = list.map((q, idx) => {
+    const question = escapeHtml(q.question);
+    const A = escapeHtml(q.choices?.A);
+    const B = escapeHtml(q.choices?.B);
+    const C = escapeHtml(q.choices?.C);
+    const D = escapeHtml(q.choices?.D);
 
-      return `
-        <div class="q">
-          <div class="q-meta">
-            <span class="pill">#${idx + 1}</span>
-            <span class="pill pill--soft">${topic}</span>
-            <span class="pill pill--soft">${level}</span>
+    return `
+      <div class="question">
+        <div class="question-text">
+          <span class="number">${idx + 1}.</span>
+          <span>${question}</span>
+        </div>
+
+        <div class="choices">
+          <div class="choice">
+            <span class="letter">A.</span>
+            <span>${A}</span>
           </div>
-          ${competency ? `<div class="q-comp">${competency}</div>` : ''}
-          <div class="q-text">${question}</div>
-          <div class="choices">
-            <div><b>A.</b> ${A}</div>
-            <div><b>B.</b> ${B}</div>
-            <div><b>C.</b> ${C}</div>
-            <div><b>D.</b> ${D}</div>
+
+          <div class="choice">
+            <span class="letter">B.</span>
+            <span>${B}</span>
+          </div>
+
+          <div class="choice">
+            <span class="letter">C.</span>
+            <span>${C}</span>
+          </div>
+
+          <div class="choice">
+            <span class="letter">D.</span>
+            <span>${D}</span>
           </div>
         </div>
-      `;
-    }).join('');
-
-    const html = `
-      <!doctype html>
-      <html>
-        <head>
-          <meta charset="utf-8" />
-          <meta name="viewport" content="width=device-width, initial-scale=1" />
-          <title>Generated Questions</title>
-          <style>
-            @page { margin: 16mm; }
-            body { font-family: Arial, Helvetica, sans-serif; color: #111827; }
-            h1 { font-size: 18px; margin: 0 0 6px 0; }
-            .sub { color: #4b5563; margin: 0 0 14px 0; font-size: 12px; }
-            .q { break-inside: avoid; page-break-inside: avoid; border: 1px solid #e5e7eb; border-radius: 10px; padding: 10px 12px; margin: 0 0 10px 0; }
-            .q-meta { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 8px; }
-            .pill { display: inline-block; padding: 2px 8px; border-radius: 999px; background: #4f46e5; color: #fff; font-size: 12px; font-weight: 700; }
-            .pill--soft { background: #eef2ff; color: #3730a3; }
-            .q-comp { font-size: 12px; font-weight: 700; color: #4b5563; margin-bottom: 8px; }
-            .q-text { font-size: 14px; font-weight: 700; margin-bottom: 8px; }
-            .choices { display: grid; grid-template-columns: 1fr 1fr; gap: 6px 14px; font-size: 13px; }
-            @media print {
-              .no-print { display: none !important; }
-            }
-          </style>
-        </head>
-        <body>
-          <h1>Generated Questions</h1>
-          <div class="sub">${escapeHtml(this.className)} • ${escapeHtml(this.subjectName)}</div>
-          ${rows}
-          <script>
-            window.onload = function() {
-              window.focus();
-              window.print();
-            };
-          </script>
-        </body>
-      </html>
+      </div>
     `;
+  }).join('');
 
-    const w = window.open('', '_blank');
-    if (!w) {
-      await this.presentAlert('Popup blocked. Please allow popups to print.');
-      return;
-    }
-    w.document.open();
-    w.document.write(html);
-    w.document.close();
+  const html = `
+    <!doctype html>
+    <html>
+      <head>
+        <meta charset="utf-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1" />
+
+        <title>${escapeHtml(this.className)} - ${escapeHtml(this.subjectName)}</title>
+
+        <style>
+          @page {
+            size: A4;
+            margin: 15mm 16mm;
+          }
+
+          * {
+            box-sizing: border-box;
+          }
+
+          body {
+            margin: 0;
+            padding: 0;
+            font-family: "Times New Roman", Times, serif;
+            color: #000;
+            font-size: 10.5pt;
+            line-height: 1.2;
+          }
+
+          .header {
+            text-align: center;
+            margin-bottom: 20px;
+          }
+
+          .class-name {
+            font-size: 16pt;
+            font-weight: bold;
+            margin-bottom: 2px;
+          }
+
+          .subject-name {
+            font-size: 14pt;
+            font-weight: bold;
+            margin-bottom: 18px;
+          }
+
+          .directions {
+            text-align: left;
+            font-size: 11pt;
+            margin-bottom: 18px;
+          }
+
+          .questions {
+            column-count: 2;
+            column-gap: 28px;
+            column-fill: balance;
+          }
+
+          .question {
+            break-inside: avoid;
+            page-break-inside: avoid;
+            margin-bottom: 11px;
+          }
+
+          .question-text {
+            display: flex;
+            align-items: flex-start;
+            gap: 5px;
+            font-size: 10.5pt;
+            margin-bottom: 4px;
+          }
+
+          .number {
+            font-weight: normal;
+            flex: 0 0 auto;
+          }
+
+          .choices {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            column-gap: 14px;
+            row-gap: 1px;
+            margin-left: 18px;
+            font-size: 10pt;
+          }
+
+          .choice {
+            display: flex;
+            align-items: flex-start;
+            gap: 4px;
+          }
+
+          .letter {
+            flex: 0 0 auto;
+          }
+
+          @media print {
+            body {
+              -webkit-print-color-adjust: exact;
+              print-color-adjust: exact;
+            }
+
+            .question {
+              break-inside: avoid;
+              page-break-inside: avoid;
+            }
+          }
+        </style>
+      </head>
+
+      <body>
+        <div class="header">
+          <div class="class-name">
+            ${escapeHtml(this.className)}
+          </div>
+
+          <div class="subject-name">
+            ${escapeHtml(this.subjectName)}
+          </div>
+        </div>
+
+        <div class="directions">
+          <strong>Directions:</strong>
+          Select the best answer from the given choices.
+        </div>
+
+        <div class="questions">
+          ${questionsHtml}
+        </div>
+
+        <script>
+          window.onload = function() {
+            window.focus();
+            window.print();
+          };
+        </script>
+      </body>
+    </html>
+  `;
+
+  const w = window.open('', '_blank');
+
+  if (!w) {
+    await this.presentAlert(
+      'Popup blocked. Please allow popups to print.'
+    );
+    return;
   }
 
+  w.document.open();
+  w.document.write(html);
+  w.document.close();
+}
   private normalizeAnswerLetter(v: any): 'A' | 'B' | 'C' | 'D' | '' {
     const s = String(v || '').trim().toUpperCase();
     return (s === 'A' || s === 'B' || s === 'C' || s === 'D') ? (s as any) : '';

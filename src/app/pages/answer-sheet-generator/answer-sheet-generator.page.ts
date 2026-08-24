@@ -12,6 +12,8 @@ import { Share } from '@capacitor/share';
 import { Filesystem, Directory, Encoding } from '@capacitor/filesystem';
 import { TeacherService, ClassStudent } from '../../services/teacher.service';
 import { bubbles, BubbleTemplate } from '../../data/bubble-template';
+import html2canvas from 'html2canvas';
+
 
 @Component({
   selector: 'app-answer-sheet-generator',
@@ -59,6 +61,19 @@ export class AnswerSheetGeneratorPage implements OnInit {
     private alertController: AlertController,
     private teacherService: TeacherService
   ) {}
+  getX(index: number): number {
+    const group = Math.floor(index / 10);
+    const colWidth = 200;
+    const col = group % 3;
+    return 120 + col * colWidth;
+  }
+
+  getY(index: number): number {
+    const group = Math.floor(index / 10);
+    const row = index % 10;
+    const rowHeight = 30; // tighter rows
+    return group < 3 ? 185 + row * rowHeight : 505 + row * rowHeight;
+  }
 
   private async presentAlert(message: string, header = '') {
     const alert = await this.alertController.create({
@@ -424,7 +439,7 @@ export class AnswerSheetGeneratorPage implements OnInit {
 
     return pdf;
   }
-
+/** 
   async exportPDF() {
     if (this.isExporting) return;
     this.isExporting = true;
@@ -539,4 +554,366 @@ export class AnswerSheetGeneratorPage implements OnInit {
     });
     await toast.present();
   }
+    */
+async exportPDF() {
+  if (this.isExporting) return;
+
+  this.isExporting = true;
+
+  const loading = await this.loadingController.create({
+    message: 'Generating PDF...',
+    spinner: 'dots',
+  });
+
+  await loading.present();
+
+  try {
+    const element = document.getElementById('answer-sheet-container');
+
+    if (!element) {
+      throw new Error('Answer sheet not found.');
+    }
+
+    const svg = element.querySelector('svg') as SVGSVGElement | null;
+
+    if (!svg) {
+      throw new Error('Answer sheet SVG not found.');
+    }
+
+    // Make sure Angular has finished rendering the current student.
+    await new Promise(resolve => requestAnimationFrame(() => resolve(null)));
+    await new Promise(resolve => setTimeout(resolve, 100));
+
+    /*
+     * Render the SVG directly.
+     * This avoids html2canvas having to interpret the SVG/Angular DOM.
+     */
+    const svgClone = svg.cloneNode(true) as SVGElement;
+
+    svgClone.setAttribute('xmlns', 'http://www.w3.org/2000/svg');
+
+    const serializer = new XMLSerializer();
+    const svgString = serializer.serializeToString(svgClone);
+
+    const svgBlob = new Blob(
+      [svgString],
+      { type: 'image/svg+xml;charset=utf-8' }
+    );
+
+    const svgUrl = URL.createObjectURL(svgBlob);
+
+    try {
+      const img = new Image();
+
+      await new Promise<void>((resolve, reject) => {
+        img.onload = () => resolve();
+        img.onerror = () => reject(
+          new Error('Could not render the answer sheet.')
+        );
+        img.src = svgUrl;
+      });
+
+      /*
+       * Use the actual SVG dimensions.
+       */
+      const svgWidth = 850;
+      const svgHeight = 1231;
+
+      const canvas = document.createElement('canvas');
+
+      const scale = Capacitor.getPlatform() === 'web' ? 2 : 1.5;
+
+      canvas.width = Math.round(svgWidth * scale);
+      canvas.height = Math.round(svgHeight * scale);
+
+      const ctx = canvas.getContext('2d');
+
+      if (!ctx) {
+        throw new Error('Could not create canvas context.');
+      }
+
+      ctx.fillStyle = '#ffffff';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+      ctx.setTransform(scale, 0, 0, scale, 0, 0);
+
+      ctx.drawImage(
+        img,
+        0,
+        0,
+        svgWidth,
+        svgHeight
+      );
+
+      /*
+       * Convert rendered sheet to PNG.
+       */
+      const imgData = canvas.toDataURL('image/png');
+
+      /*
+       * Create A4 PDF.
+       */
+      const pdf = new jsPDF({
+        orientation: 'portrait',
+        unit: 'mm',
+        format: 'a4',
+      });
+
+      const pageWidth = pdf.internal.pageSize.getWidth();
+      const pageHeight = pdf.internal.pageSize.getHeight();
+
+      const imgProps = pdf.getImageProperties(imgData);
+
+      const imageRatio = imgProps.height / imgProps.width;
+
+      let pdfWidth = pageWidth;
+      let pdfHeight = pdfWidth * imageRatio;
+
+      /*
+       * Keep the entire answer sheet inside the A4 page.
+       */
+      if (pdfHeight > pageHeight) {
+        pdfHeight = pageHeight;
+        pdfWidth = pdfHeight / imageRatio;
+      }
+
+      const x = (pageWidth - pdfWidth) / 2;
+      const y = (pageHeight - pdfHeight) / 2;
+
+      pdf.addImage(
+        imgData,
+        'PNG',
+        x,
+        y,
+        pdfWidth,
+        pdfHeight
+      );
+
+      const fileName =
+        `answer-sheet-${this.className || 'class'}-${this.subjectName || 'exam'}-${Date.now()}.pdf`;
+
+      /*
+       * ==============================
+       * WEB
+       * ==============================
+       */
+      if (Capacitor.getPlatform() === 'web') {
+
+        // jsPDF handles the browser download directly.
+        pdf.save(fileName);
+
+        await this.showToast('✅ PDF downloaded successfully.');
+
+        return;
+      }
+
+      /*
+       * ==============================
+       * MOBILE
+       * ==============================
+       */
+
+      // Get PDF as base64.
+      const dataUri = pdf.output('datauristring');
+
+      const pdfBase64 = dataUri.split(',')[1];
+
+      if (!pdfBase64) {
+        throw new Error('Could not convert PDF to base64.');
+      }
+
+      /*
+       * Save into the app's Documents directory.
+       */
+      await Filesystem.writeFile({
+        path: fileName,
+        data: pdfBase64,
+        directory: Directory.Documents,
+        recursive: true,
+      });
+
+      console.log('PDF saved:', fileName);
+
+      /*
+       * Get the actual native URI.
+       */
+      const fileUri = await Filesystem.getUri({
+        path: fileName,
+        directory: Directory.Documents,
+      });
+
+      console.log('PDF URI:', fileUri.uri);
+
+      await this.showToast('✅ PDF saved. Opening share options...');
+
+      /*
+       * Share the actual file URI.
+       */
+      await Share.share({
+        title: 'Generated Answer Sheet',
+        text: 'Here is the generated answer sheet.',
+        url: fileUri.uri,
+        dialogTitle: 'Share Answer Sheet',
+      });
+
+      await this.showToast('✅ PDF ready to share.');
+
+    } finally {
+      URL.revokeObjectURL(svgUrl);
+    }
+
+  } catch (error) {
+
+    console.error('=================================');
+    console.error('ANSWER SHEET EXPORT ERROR');
+    console.error(error);
+    console.error('=================================');
+
+    const message =
+      error instanceof Error
+        ? error.message
+        : String(error);
+
+    await this.presentAlert(
+      `Failed to export answer sheet.\n\n${message}`,
+      'Export Error'
+    );
+
+  } finally {
+
+    await loading.dismiss();
+
+    this.applySelectedStudent();
+
+    this.isExporting = false;
+  }
+}
+/*
+  async exportPDF() {
+  const element = document.getElementById('answer-sheet-container');
+  if (!element) {
+    alert('Answer sheet not found.');
+    return;
+  }
+
+  const loading = await this.loadingController.create({
+    message: 'Generating PDF...',
+    spinner: 'dots',
+  });
+  await loading.present();
+
+  try {
+    // ✅ Clone the element so the preview isn't disturbed
+    const clone = element.cloneNode(true) as HTMLElement;
+    const rect = element.getBoundingClientRect();
+    clone.style.width = rect.width + "px";
+    clone.style.height = rect.height + "px";
+    clone.style.position = "fixed";
+    clone.style.left = "-10000px";
+    clone.style.top = "-10000px";
+    clone.style.paddingTop = "180px";
+    clone.style.zIndex = "-1";
+    document.body.appendChild(clone);
+
+    // 📸 Render
+    const canvas = await html2canvas(clone, {
+      backgroundColor: "#ffffff",
+      scale: 2,
+      useCORS: true,
+    });
+
+    document.body.removeChild(clone);
+
+    // Convert canvas → PDF
+    const imgData = canvas.toDataURL("image/png");
+    const pdf = new jsPDF({
+      orientation: "portrait",
+      unit: "mm",
+      format: "a4",
+    });
+
+    const imgProps = pdf.getImageProperties(imgData);
+    const pdfWidth = pdf.internal.pageSize.getWidth();
+    const pdfHeight = (imgProps.height * pdfWidth) / imgProps.width;
+    const x = 0;
+    const y = (pdf.internal.pageSize.getHeight() - pdfHeight) / 2;
+
+    pdf.addImage(imgData, "PNG", x, y, pdfWidth, pdfHeight);
+
+    const fileName = `answer-sheet-${Date.now()}.pdf`;
+
+if (Capacitor.getPlatform() !== 'web') {
+  const pdfBase64 = pdf.output('datauristring').split(',')[1];
+  try {
+    // Step 1: Save file
+    const savedFile = await Filesystem.writeFile({
+      path: fileName,
+      data: pdfBase64,
+      directory: Directory.Documents,
+    });
+
+    this.showToast('✅ PDF saved!');
+
+    // Step 2: Get sharable URI
+    let shareUrl = '';
+    if (Capacitor.getPlatform() === 'android') {
+      // Android → need content:// URI
+      const fileUri = await Filesystem.getUri({
+        path: fileName,
+        directory: Directory.Documents,
+      });
+      shareUrl = fileUri.uri; // content:// URI
+    } else if (Capacitor.getPlatform() === 'ios') {
+      // iOS → can use base64 data URI
+      shareUrl = `data:application/pdf;base64,${pdfBase64}`;
+    }
+  
+    // Step 3: Share file
+    await Share.share({
+      title: 'Generated Answer Sheet',
+      text: 'Here is the generated answer sheet.',
+      url: shareUrl,
+      dialogTitle: 'Share PDF',
+    });
+
+    this.showToast('✅ PDF shared!');
+  } catch (err) {
+    console.error('PDF save/share failed:', err);
+    this.showToast('⚠️ PDF saved, but sharing failed.');
+  } finally {
+    await loading.dismiss();
+  } 
+}
+
+else {
+  // 💻 Browser
+  const blobUrl = pdf.output('bloburl').toString();
+  const link = document.createElement('a');
+  link.href = blobUrl;
+  link.download = fileName;
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+
+  await loading.dismiss();
+  window.open(blobUrl, '_blank');
+  this.showToast('✅ PDF downloaded and opened!');
+}
+
+} catch (error) {
+  console.error('Export error:', error);
+  await loading.dismiss();
+  this.showToast('❌ Failed to export or share PDF.');
+}
+}
+*/
+private async showToast(message: string) {
+  const toast = await this.toastController.create({
+    message,
+    duration: 3000,
+    position: 'bottom',
+    color: 'dark',
+  });
+  await toast.present();
+}
 }

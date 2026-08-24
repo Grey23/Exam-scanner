@@ -169,28 +169,31 @@
         </ion-card-header>
         <ion-card-content>
 
-          <p><strong>Total Answers:</strong> {{ overallResponseStats.totalAnswers }}</p>
-
           <p>
-            <strong>Correct:</strong>
-            {{ overallResponseStats.correct }}
-            ({{ overallResponseStats.correctPercentage | number:'1.0-1' }}%)
-          </p>
+          <strong>Total Answers:</strong>
+          {{ overallResponseStats.totalAnswers }}
+        </p>
 
-          <p>
-            <strong>Incorrect:</strong>
-            {{ overallResponseStats.incorrect }}
-            ({{ overallResponseStats.incorrectPercentage | number:'1.0-1' }}%)
-          </p>
+        <p>
+          <strong>Correct:</strong>
+          {{ overallResponseStats.correct }}
+          ({{ overallResponseStats.correctPercentage | number:'1.0-1' }}%)
+        </p>
 
-          <hr>
+        <p>
+          <strong>Incorrect:</strong>
+          {{ overallResponseStats.incorrect }}
+          ({{ overallResponseStats.incorrectPercentage | number:'1.0-1' }}%)
+        </p>
 
-          <p><strong>Overall Answer Distribution</strong></p>
+        <hr>
 
-          <p>A: {{ overallResponseStats.optionCounts.A }}</p>
-          <p>B: {{ overallResponseStats.optionCounts.B }}</p>
-          <p>C: {{ overallResponseStats.optionCounts.C }}</p>
-          <p>D: {{ overallResponseStats.optionCounts.D }}</p>
+        <p><strong>Overall Answer Distribution</strong></p>
+
+        <p>A: {{ overallResponseStats.optionCounts.A }}</p>
+        <p>B: {{ overallResponseStats.optionCounts.B }}</p>
+        <p>C: {{ overallResponseStats.optionCounts.C }}</p>
+        <p>D: {{ overallResponseStats.optionCounts.D }}</p>
         <hr>
 
           <h3>Answer Distribution</h3>
@@ -223,7 +226,7 @@
       </ion-row>
 
       <ion-row
-        *ngFor="let item of itemAnalysis"
+        *ngFor="let item of itemAnalysisData"
         class="ion-text-center">
 
         <ion-col>{{ item.question }}</ion-col>
@@ -279,14 +282,14 @@
 
               <div class="response-student-list">
                 <span class="response-preview-text">
-                  {{ getOptionResponseLabel(item, option) }}
+                  test
                 </span>
               </div>
 
               <div class="response-stats">
 
                 <span class="response-count-badge">
-                  {{ getOptionResponses(item, option).length }}
+                  0
                 </span>
 
                 <span class="response-percent">
@@ -495,31 +498,41 @@
     </div>
 
     <ion-card class="tos-topic-card">
-      <ion-card-content>
-        <div class="students-loading" *ngIf="isLoadingStudents">
-          <ion-spinner name="crescent"></ion-spinner>
-        </div>
+  <ion-card-content>
 
-        <ion-list *ngIf="!isLoadingStudents">
-          <ion-item lines="none" *ngIf="students.length === 0">
-            <ion-label>No enrolled students found.</ion-label>
-          </ion-item>
+    <div class="students-loading" *ngIf="isLoadingStudents">
+      <ion-spinner name="crescent"></ion-spinner>
+    </div>
 
-          <ion-item
-            button
-            lines="none"
-            *ngFor="let s of students"
-            (click)="selectStudent(s.id)"
+    <ion-list *ngIf="!isLoadingStudents">
+
+      <ion-item lines="none" *ngIf="students.length === 0">
+        <ion-label>No enrolled students found.</ion-label>
+      </ion-item>
+
+      <ion-item
+        button
+        lines="none"
+        *ngFor="let s of students"
+        (click)="selectStudent(s.id)"
+      >
+        <ion-label>
+          <div style="font-weight: 900;">{{ s.name }}</div>
+
+          <div
+            style="opacity: 0.85; font-size: 12px;"
+            *ngIf="s.roll_number"
           >
-            <ion-label>
-              <div style="font-weight: 900;">{{ s.name }}</div>
-              <div style="opacity: 0.85; font-size: 12px;" *ngIf="s.roll_number">Roll: {{ s.roll_number }}</div>
-              <div style="opacity: 0.85; font-size: 12px;" *ngIf="getStudentLatestLabel(s.id)">Latest: {{ getStudentLatestLabel(s.id) }}</div>
-            </ion-label>
-          </ion-item>
-        </ion-list>
-      </ion-card-content>
-    </ion-card>
+            Roll: {{ s.roll_number }}
+          </div>
+
+        </ion-label>
+      </ion-item>
+
+    </ion-list>
+
+  </ion-card-content>
+</ion-card>
 
     <ion-card class="tos-topic-card" *ngIf="getSelectedStudent()">
       <ion-card-header>
@@ -543,20 +556,40 @@
             </div>
           </div>
 
-          <div class="topic-strengths" *ngIf="getStrongestTopics().length">
-            <h4 class="topic-section-title">Strongest topics</h4>
+          <div
+            class="topic-strengths"
+            *ngIf="strongestStudentTopics.length">
+
+            <h4 class="topic-section-title">
+              Strongest topics
+            </h4>
+
             <div class="topic-tags">
-              <span class="topic-tag strong" *ngFor="let t of getStrongestTopics()">
+              <span
+                class="topic-tag strong"
+                *ngFor="let t of strongestStudentTopics">
+
                 {{ t.topic }} {{ t.percent }}%
+
               </span>
             </div>
           </div>
 
-          <div class="topic-strengths" *ngIf="getWeakestTopics().length">
-            <h4 class="topic-section-title">Needs improvement</h4>
+          <div
+            class="topic-strengths"
+            *ngIf="weakestStudentTopics.length">
+
+            <h4 class="topic-section-title">
+              Needs improvement
+            </h4>
+
             <div class="topic-tags">
-              <span class="topic-tag weak" *ngFor="let t of getWeakestTopics()">
+              <span
+                class="topic-tag weak"
+                *ngFor="let t of weakestStudentTopics">
+
                 {{ t.topic }} {{ t.percent }}%
+
               </span>
             </div>
           </div>
