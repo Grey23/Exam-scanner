@@ -588,9 +588,7 @@ async printQuestions() {
           }
 
           .questions {
-            column-count: 2;
-            column-gap: 28px;
-            column-fill: balance;
+            width: 100%;
           }
 
           .question {
@@ -642,11 +640,23 @@ async printQuestions() {
               page-break-inside: avoid;
             }
           }
+          .brand-logo {
+            width: 70px;
+            height: 70px;
+            object-fit: contain;
+            display: block;
+            margin: 0 auto 8px auto;
+          }
         </style>
       </head>
 
       <body>
         <div class="header">
+        <img
+          src="${window.location.origin}/assets/logo/school-logo.jpg"
+          alt="School logo"
+          class="brand-logo"
+        />
           <div class="class-name">
             ${escapeHtml(this.className)}
           </div>
@@ -658,7 +668,7 @@ async printQuestions() {
 
         <div class="directions">
           <strong>Directions:</strong>
-          Select the best answer from the given choices.
+Read each question carefully, choose the best answer, and mark it clearly on your answer sheet.
         </div>
 
         <div class="questions">
