@@ -904,10 +904,420 @@ export class ScanPage implements AfterViewInit, OnDestroy {
     if (!this.selectedStudentId) return undefined;
     return (this.students || []).find(s => Number(s.id) === Number(this.selectedStudentId));
   }
+  
+  private decodeStudentCodeFromWarpedMat(
+  warped: any
+): {
+  classId: number;
+  subjectId: number;
+  studentId: number;
+} | null {
 
+  try {
+    /*
+     * The generator places the code at:
+     *
+     * x = 615 + c * 6
+     * y = 100 + r * 6
+     *
+     * The four printed markers are:
+     *
+     * TL = (95, 20)
+     * TR = (705, 20)
+     * BL = (95, 815)
+     * BR = (705, 815)
+     *
+     * Perspective correction maps those markers to:
+     *
+     * TL = (0, 0)
+     * TR = (800, 0)
+     * BR = (800, 1131)
+     * BL = (0, 1131)
+     */
+alert('🔵 decodeStudentCodeFromWarpedMat() STARTED');
+    const SOURCE_LEFT = 95;
+    const SOURCE_RIGHT = 705;
+    const SOURCE_TOP = 20;
+    const SOURCE_BOTTOM = 815;
+
+    const DEST_WIDTH = 800;
+    const DEST_HEIGHT = 1131;
+
+    const CODE_X = 615;
+    const CODE_Y = 100;
+    const CELL_SIZE = 6;
+
+    const sourceWidth = SOURCE_RIGHT - SOURCE_LEFT;
+    const sourceHeight = SOURCE_BOTTOM - SOURCE_TOP;
+
+    /*
+     * Convert the SVG coordinate into the
+     * perspective-corrected image coordinate.
+     */
+    const mapX = (x: number) =>
+      ((x - SOURCE_LEFT) / sourceWidth) * DEST_WIDTH;
+
+    const mapY = (y: number) =>
+      ((y - SOURCE_TOP) / sourceHeight) * DEST_HEIGHT;
+
+const grid: number[][] = [];
+
+alert(
+  `🟢 Decoder started reading grid\n\n` +
+  `Code position: ${CODE_X}, ${CODE_Y}\n` +
+  `Cell size: ${CELL_SIZE}\n` +
+  `Warped size: ${warped.cols} × ${warped.rows}`
+);
+const cellDebug: string[] = [];
+
+/*
+ * Read all 8 × 8 cells.
+ */
+for (let r = 0; r < 8; r++) {
+
+  const row: number[] = [];
+
+  for (let c = 0; c < 8; c++) {
+
+    const svgX = CODE_X + c * CELL_SIZE;
+    const svgY = CODE_Y + r * CELL_SIZE;
+
+    const x1 = Math.round(mapX(svgX));
+    const y1 = Math.round(mapY(svgY));
+
+    const x2 = Math.round(mapX(svgX + CELL_SIZE));
+    const y2 = Math.round(mapY(svgY + CELL_SIZE));
+
+    const width = Math.max(1, x2 - x1);
+    const height = Math.max(1, y2 - y1);
+
+    /*
+     * Sample the CENTER of the cell.
+     *
+     * This avoids the black border around
+     * each white cell.
+     */
+    const marginX = Math.max(1, Math.round(width * 0.15));
+    const marginY = Math.max(1, Math.round(height * 0.15));
+
+    const sampleRect = new cv.Rect(
+      x1 + marginX,
+      y1 + marginY,
+      Math.max(1, width - marginX * 2),
+      Math.max(1, height - marginY * 2)
+    );
+
+    if (
+      sampleRect.x < 0 ||
+      sampleRect.y < 0 ||
+      sampleRect.x + sampleRect.width > warped.cols ||
+      sampleRect.y + sampleRect.height > warped.rows
+    ) {
+      alert(
+        '❌ ROI OUT OF BOUNDS\n\n' +
+        `Cell: [${r}, ${c}]\n` +
+        `x=${sampleRect.x}\n` +
+        `y=${sampleRect.y}\n` +
+        `width=${sampleRect.width}\n` +
+        `height=${sampleRect.height}\n\n` +
+        `Warped:\n` +
+        `${warped.cols} × ${warped.rows}`
+      );
+
+      return null;
+    }
+
+    const cell = warped.roi(sampleRect);
+
+    const gray = new cv.Mat();
+
+    if (cell.channels() === 4) {
+      cv.cvtColor(cell, gray, cv.COLOR_RGBA2GRAY);
+    } else if (cell.channels() === 3) {
+      cv.cvtColor(cell, gray, cv.COLOR_RGB2GRAY);
+    } else {
+      cell.copyTo(gray);
+    }
+
+    const mean = cv.mean(gray)[0];
+
+    /*
+     * Black cell → low brightness
+     * White cell → high brightness
+     */
+    const filled = mean < 105 ? 1 : 0;
+
+    row.push(filled);
+
+    // Store information for ONE final alert
+    cellDebug.push(
+      `[${r},${c}] Mean=${mean.toFixed(1)} Bit=${filled}`
+    );
+
+    gray.delete();
+    cell.delete();
+  }
+
+  grid.push(row);
+  // ==========================================
+
+}
+// NORMALIZE FINDER PATTERN
+// ==========================================
+
+for (let c = 0; c < 8; c++) {
+  grid[0][c] = 1;
+}
+
+for (let r = 0; r < 8; r++) {
+  grid[r][0] = 1;
+}
+// Show all 64 cells in ONE alert
+alert(
+  '📦 STUDENT CODE CELL VALUES\n\n' +
+  cellDebug.join('\n') +
+  '\n\n' +
+  '========== 8×8 GRID ==========\n\n' +
+  grid.map(row => row.join(' ')).join('\n')
+);
+
+    console.log('========== STUDENT CODE GRID ==========');
+    console.table(grid);
+    alert(
+      '📦 DETECTED 8×8 GRID\n\n' +
+      grid.map(row => row.join(' ')).join('\n')
+    );
+    /*
+     * The first row and first column are
+     * supposed to be the finder border.
+     *
+     * Validate them before trusting the code.
+     */
+      const topRowBlackCount =
+        grid[0].filter(v => v === 1).length;
+
+      const leftColumnBlackCount =
+        grid.map(row => row[0]).filter(v => v === 1).length;
+
+      const finderValid =
+        topRowBlackCount >= 7 &&
+        leftColumnBlackCount >= 7;
+
+      // Show finder test on mobile
+      alert(
+        '🔍 FINDER PATTERN CHECK\n\n' +
+        `Top row: ${topRowBlackCount}/8 black\n` +
+        `Left column: ${leftColumnBlackCount}/8 black\n\n` +
+        `Result: ${finderValid ? '✅ VALID' : '❌ INVALID'}`
+      );
+
+      if (!finderValid) {
+        console.warn('Student code finder pattern not valid.');
+        console.table(grid);
+
+        alert(
+          '⚠️ CODE PATTERN FAILED\n\n' +
+          'Grid detected:\n' +
+          grid.map(row => row.join(' ')).join('\n')
+        );
+
+        return null;
+      }
+
+
+    /*
+     * Extract the inner 7 × 7 area.
+     *
+     * 49 available bits:
+     *
+     * 16 = class
+     * 16 = subject
+     * 16 = student
+     * 1  = unused
+     */
+    const bits: number[] = [];
+
+    for (let r = 1; r < 8; r++) {
+      for (let c = 1; c < 8; c++) {
+        bits.push(grid[r][c]);
+      }
+    }
+
+    if (bits.length < 48) {
+      console.warn('Not enough student-code bits.');
+      return null;
+    }
+
+    /*
+     * Convert 16 binary bits into a number.
+     */
+    const bitsToNumber = (start: number): number => {
+
+      let value = 0;
+
+      for (let i = 0; i < 16; i++) {
+        value = (value << 1) | bits[start + i];
+      }
+
+      return value & 0xffff;
+    };
+
+    const classId = bitsToNumber(0);
+    const subjectId = bitsToNumber(16);
+    const studentId = bitsToNumber(32);
+
+    alert(
+      '🎉 CODE DECODED!\n\n' +
+      `Class ID: ${classId}\n` +
+      `Subject ID: ${subjectId}\n` +
+      `Student ID: ${studentId}`
+    );
+
+    const decoded = {
+      classId,
+      subjectId,
+      studentId
+    };
+
+    console.log('========== DECODED STUDENT CODE ==========');
+    console.log(decoded);
+
+    return decoded;
+
+  } catch (error) {
+
+  console.error(
+    'Failed to decode student identity code:',
+    error
+  );
+
+  alert(
+    '❌ DECODER ERROR\n\n' +
+    String(error)
+  );
+
+  return null;
+}
+}
+private decodeStudentCodeGrid(grid: number[][]): {
+  classId: number;
+  subjectId: number;
+  studentId: number;
+} | null {
+  if (!grid || grid.length !== 8) {
+    return null;
+  }
+
+  if (grid.some(row => !row || row.length !== 8)) {
+    return null;
+  }
+
+  // Read the inner 7x7 area row-major.
+  const bits: number[] = [];
+
+  for (let r = 1; r < 8; r++) {
+    for (let c = 1; c < 8; c++) {
+      const bit = Number(grid[r][c]);
+
+      if (bit !== 0 && bit !== 1) {
+        return null;
+      }
+
+      bits.push(bit);
+    }
+  }
+
+  // We need at least:
+  // 16 bits class + 16 bits subject + 16 bits student = 48 bits
+  if (bits.length < 48) {
+    return null;
+  }
+
+  const bitsToNumber = (start: number): number => {
+    let value = 0;
+
+    for (let i = 0; i < 16; i++) {
+      value = (value << 1) | bits[start + i];
+    }
+
+    return value & 0xffff;
+  };
+
+  const classId = bitsToNumber(0);
+  const subjectId = bitsToNumber(16);
+  const studentId = bitsToNumber(32);
+
+  return {
+    classId,
+    subjectId,
+    studentId
+  };
+}
+private hasAlreadyBeenScanned(
+  classId: number,
+  subjectId: number,
+  studentId: number
+): boolean {
+  const subject = LocalDataService.getSubject(classId, subjectId);
+
+  if (!subject?.results?.length || !Number.isFinite(studentId)) {
+    return false;
+  }
+
+  return subject.results.some(result =>
+    result.studentId != null &&
+    String(result.studentId) === String(studentId)
+  );
+}
   async saveToProfile() {
     const roll = String(this.rollNumberInput || '').trim();
     const student = this.matchedStudent;
+
+    if (!roll && !student) {
+      await this.alertCtrl.create({
+        header: 'Select Student',
+        message: 'Enter the roll number from the sheet, or pick a student from the list.',
+        buttons: ['OK']
+      }).then(a => a.present());
+      return;
+    }
+
+    /* =========================================
+      CHECK IF THIS STUDENT WAS ALREADY SCANNED
+      ========================================= */
+
+    if (student?.id) {
+      const alreadyScanned = this.hasAlreadyBeenScanned(
+        this.classId,
+        this.subjectId,
+        Number(student.id)
+      );
+
+      if (alreadyScanned) {
+        const alert = await this.alertCtrl.create({
+          header: 'Sheet Already Scanned',
+          message: `${student.name || 'This student'}'s answer sheet has already been scanned. Scan again?`,
+          buttons: [
+            {
+              text: 'Cancel',
+              role: 'cancel'
+            },
+            {
+              text: 'Scan Again',
+              role: 'confirm'
+            }
+          ]
+        });
+
+        await alert.present();
+
+        const { role } = await alert.onDidDismiss();
+
+        if (role !== 'confirm') {
+          return;
+        }
+      }
+    }
 
     if (!roll && !student) {
       await this.alertCtrl.create({
@@ -1399,7 +1809,7 @@ onStartCameraButtonClick() {
     //cv.normalize(gray, norm, 0, 255, cv.NORM_MINMAX);
         // ✅ ADD THIS HERE
     //cv.medianBlur(norm, norm, 5);
-    cv.GaussianBlur(gray, gray, new cv.Size(5, 5), 0);
+    cv.GaussianBlur(gray, gray, new cv.Size(3, 3), 0);
     //alert("✅ Canvas read + grayscale + blur applied");
 
     const markerCorners: { x: number; y: number }[] = [];
@@ -1410,10 +1820,18 @@ onStartCameraButtonClick() {
     //alert(`📦 detectionBoxes count: ${this.detectionBoxes.length}`);
     //alert("2 - image loaded");
     // 🔹 Detect 4 corners
+    /*
+    alert(
+      this.detectionBoxes.map((box, i) =>
+        `Box ${i + 1}: x=${box.x}, y=${box.y}, w=${box.width}, h=${box.height}`
+      ).join('\n')
+    );
+    */
     for (const [boxIndex, box] of this.detectionBoxes.entries()) {
       //alert("3a");
       //alert(`🔍 Processing detectionBox ${boxIndex + 1}`);
       const roi = gray.roi(new cv.Rect(box.x, box.y, box.width, box.height));
+
       //const roi = norm.roi(new cv.Rect(box.x, box.y, box.width, box.height));
       const roiContours = new cv.MatVector();
       const roiHierarchy = new cv.Mat();
@@ -1421,26 +1839,83 @@ onStartCameraButtonClick() {
       //alert("3b");
       //cv.adaptiveThreshold( roi,thresh, 255, cv.ADAPTIVE_THRESH_MEAN_C, cv.THRESH_BINARY_INV,45,0);
 
+
+      const data = roi.data;
+      let darkPixels = 0;
+
+      for (let i = 0; i < data.length; i++) {
+        if (data[i] < 100) {
+          darkPixels++;
+        }
+      }
+
       const blurred = new cv.Mat();
       const thresh = new cv.Mat();
 
-      cv.GaussianBlur(
-          roi,
-          blurred,
-          new cv.Size(5,5),
-          0
-      );
+      roi.copyTo(blurred);
 
-      cv.adaptiveThreshold(
+      cv.threshold(
           blurred,
           thresh,
+          100,
           255,
-          cv.ADAPTIVE_THRESH_GAUSSIAN_C,
-          cv.THRESH_BINARY_INV,
-          31,
-          10
+          cv.THRESH_BINARY_INV
       );
+      const contoursTest = new cv.MatVector();
+      const hierarchyTest = new cv.Mat();
 
+      cv.findContours(
+          thresh,
+          contoursTest,
+          hierarchyTest,
+          cv.RETR_EXTERNAL,
+          cv.CHAIN_APPROX_SIMPLE
+      );
+/*
+      alert(
+        `BOX ${boxIndex + 1}\n` +
+        `Foreground pixels: ${cv.countNonZero(thresh)}\n` +
+        `Contours: ${contoursTest.size()}`
+      );
+*/
+      for (let i = 0; i < contoursTest.size(); i++) {
+        const c = contoursTest.get(i);
+        const r = cv.boundingRect(c);
+/*
+        alert(
+          `BOX ${boxIndex + 1} — Contour ${i + 1}\n` +
+          `Area: ${cv.contourArea(c).toFixed(1)}\n` +
+          `Width: ${r.width}\n` +
+          `Height: ${r.height}\n` +
+          `Ratio: ${(r.width / r.height).toFixed(2)}`
+        );
+*/
+        c.delete();
+      }
+
+      contoursTest.delete();
+      hierarchyTest.delete();
+
+        const darkPixelCount = cv.countNonZero(thresh);
+
+        const stats = cv.minMaxLoc(roi);
+        const mean = cv.mean(roi)[0];
+/*
+        alert(
+          `BOX ${boxIndex + 1}\n\n` +
+          `ROI: ${roi.cols} x ${roi.rows}\n` +
+          `Min: ${stats.minVal.toFixed(1)}\n` +
+          `Max: ${stats.maxVal.toFixed(1)}\n` +
+          `Mean: ${mean.toFixed(1)}\n` +
+          `Pixels <100: ${darkPixelCount}`
+        );
+
+        alert(
+          `Box ${boxIndex + 1}\n` +
+          `Threshold complete\n` +
+          `ROI: ${roi.cols} x ${roi.rows}`
+        );
+*/
       cv.findContours(
           thresh,
           roiContours,
@@ -1468,10 +1943,26 @@ onStartCameraButtonClick() {
             "Area:", cv.contourArea(cnt),
             "Vertices:", approx.rows
         );
-        if (approx.rows >= 4 && approx.rows <= 6 && cv.isContourConvex(approx)) {
-
-            const rect = cv.boundingRect(approx);
-            const ratio = rect.width / rect.height;
+          const contourArea = cv.contourArea(cnt);
+          const rect = cv.boundingRect(approx);
+          const ratio = rect.width / rect.height;
+          const isConvex = cv.isContourConvex(approx);
+/*
+          alert(
+            `BOX ${boxIndex + 1}\n\n` +
+            `Contour area: ${contourArea.toFixed(1)}\n` +
+            `Approx vertices: ${approx.rows}\n` +
+            `Convex: ${isConvex}\n` +
+            `Width: ${rect.width}\n` +
+            `Height: ${rect.height}\n` +
+            `Ratio: ${ratio.toFixed(2)}`
+          );
+*/
+          if (
+            approx.rows >= 4 &&
+            approx.rows <= 6 &&
+            isConvex
+          ) {
 
             if (ratio < 0.6 || ratio > 1.4) {
               approx.delete();
@@ -1489,6 +1980,7 @@ onStartCameraButtonClick() {
             continue;
           }*/
 
+
           if (area > 80 && area < 900 && area > maxArea) {
             maxArea = area;
             bestQuad = [];
@@ -1504,7 +1996,7 @@ onStartCameraButtonClick() {
 
       if (bestQuad) {
 
-        alert(`✅ Quad found in box ${boxIndex + 1}, area=${maxArea}`);
+        //alert(`✅ Quad found in box ${boxIndex + 1}, area=${maxArea}`);
 
         const cx = bestQuad.reduce((sum, p) => sum + p.x, 0) / 4;
         const cy = bestQuad.reduce((sum, p) => sum + p.y, 0) / 4;
@@ -1513,7 +2005,7 @@ onStartCameraButtonClick() {
 
       } else {
 
-        alert(`⚠️ No quad in box ${boxIndex + 1} — restarting scan`);
+        //alert(`⚠️ No quad in box ${boxIndex + 1} — restarting scan`);
 
         roi.delete();
         roiContours.delete();
@@ -1566,12 +2058,66 @@ onStartCameraButtonClick() {
     ]);
     const M = cv.getPerspectiveTransform(srcPoints, dstPoints);
     const dst = new cv.Mat();
-    cv.warpPerspective(src, dst, M, new cv.Size(FIXED_WIDTH, FIXED_HEIGHT));
+
+    cv.warpPerspective(
+      src,
+      dst,
+      M,
+      new cv.Size(FIXED_WIDTH, FIXED_HEIGHT)
+    );
+
+    console.log('✅ Perspective correction complete');
+
+    // ==========================================
+    // DECODE STUDENT IDENTITY CODE
+    // ==========================================
+
+    const decodedStudentCode =
+      this.decodeStudentCodeFromWarpedMat(dst);
+
+    if (decodedStudentCode) {
+
+      console.log('Decoded Class:', decodedStudentCode.classId);
+      console.log('Decoded Subject:', decodedStudentCode.subjectId);
+      console.log('Decoded Student:', decodedStudentCode.studentId);
+
+      // 📱 MOBILE TEST ALERT
+      const alert = await this.alertCtrl.create({
+        header: '✅ Student Code Detected',
+        message:
+          `Class ID: ${decodedStudentCode.classId}<br>` +
+          `Subject ID: ${decodedStudentCode.subjectId}<br>` +
+          `Student ID: ${decodedStudentCode.studentId}`,
+        buttons: ['OK']
+      });
+
+      await alert.present();
+
+    } else {
+
+      console.warn('⚠️ Student identity code could not be decoded.');
+
+      // 📱 MOBILE ERROR ALERT
+      const alert = await this.alertCtrl.create({
+        header: '⚠️ Code Not Detected',
+        message:
+          'The student identity code could not be decoded from this sheet.',
+        buttons: ['OK']
+      });
+
+      await alert.present();
+    }
+    // Save warpedMat for processSheet
+    if (this.latestWarpedMat) {
+      this.latestWarpedMat.delete();
+    }
+
+    this.latestWarpedMat = dst.clone();
     //alert("✅ Perspective transform complete");
 
     // ✅ Save warpedMat for processSheet
-    if (this.latestWarpedMat) this.latestWarpedMat.delete();
-    this.latestWarpedMat = dst.clone();
+    //if (this.latestWarpedMat) this.latestWarpedMat.delete();
+    //this.latestWarpedMat = dst.clone();
     //alert("4 - perspective done");
     // Show warped result
     canvas.width = FIXED_WIDTH;

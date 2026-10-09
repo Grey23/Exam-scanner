@@ -32,6 +32,7 @@ export class QuestionGeneratorPage implements OnInit {
     topic: string;
     competency: string;
     level: string;
+    levelSource?: 'ai' | 'teacher';
     question: string;
     choices: { A: string; B: string; C: string; D: string };
     answer: 'A' | 'B' | 'C' | 'D' | '';
@@ -42,6 +43,7 @@ export class QuestionGeneratorPage implements OnInit {
     topic: string;
     competency: string;
     level: string;
+    levelSource?: 'ai' | 'teacher';
     question: string;
     choices: { A: string; B: string; C: string; D: string };
     answer: 'A' | 'B' | 'C' | 'D' | '';
@@ -154,68 +156,211 @@ export class QuestionGeneratorPage implements OnInit {
     ).sort((a, b) => a.localeCompare(b));
   }
 
-  async ngOnInit() {
-    await LocalDataService.load();
-    this.classId = Number(this.route.snapshot.paramMap.get('classId'));
-    this.subjectId = Number(this.route.snapshot.paramMap.get('subjectId'));
+async ngOnInit() {
+  await LocalDataService.load();
 
-    if (!Number.isFinite(this.classId) || !Number.isFinite(this.subjectId)) {
-      await this.presentAlert(
-        'Missing class/subject. Please go back to TOS and open Question Generator again.'
-      );
-      return;
-    }
+  this.classId =
+    Number(this.route.snapshot.paramMap.get('classId'));
 
-    const cls = LocalDataService.getClass(this.classId);
-    const subject = LocalDataService.getSubject(this.classId, this.subjectId);
+  this.subjectId =
+    Number(this.route.snapshot.paramMap.get('subjectId'));
 
-    this.tos = (Array.isArray(subject?.tos) ? subject?.tos : [])
-      .map((r: any) => this.normalizeTosRow(r))
+  if (
+    !Number.isFinite(this.classId) ||
+    !Number.isFinite(this.subjectId)
+  ) {
+    await this.presentAlert(
+      'Missing class/subject. Please go back to TOS and open Question Generator again.'
+    );
+    return;
+  }
+
+  // ============================================================
+  // 1. LOAD LOCAL CLASS / SUBJECT
+  // ============================================================
+
+  const cls =
+    LocalDataService.getClass(this.classId);
+
+  const subject =
+    LocalDataService.getSubject(
+      this.classId,
+      this.subjectId
+    );
+
+  this.className =
+    cls?.name || '';
+
+  this.subjectName =
+    subject?.name || '';
+
+  // ============================================================
+  // 2. LOAD LOCAL TOS
+  // ============================================================
+
+  this.tos =
+    (Array.isArray(subject?.tos)
+      ? subject.tos
+      : []
+    )
+      .map((r: any) =>
+        this.normalizeTosRow(r)
+      )
       .filter(Boolean) as TopicEntry[];
 
-    // Load cached questions (fallback) while we fetch from Firebase.
-    this.questions = Array.isArray(subject?.questions) ? (subject?.questions as any[]) : [];
-    this.refreshDisplayQuestions();
+  this.recomputeTopicOptions();
 
-    this.className = cls?.name || '';
-    this.subjectName = subject?.name || '';
-
-    this.recomputeTopicOptions();
-
-    if (this.topicOptions.length && !this.topicOptions.includes(this.selectedTopic)) {
-      this.selectedTopic = this.topicOptions[0];
-    }
-
-    // Load TOS and questions from Firebase in parallel.
-    const [tosRes, qRes] = await Promise.all([
-      this.loadTosFromFirebase(),
-      this.teacherService.loadSubjectQuestions(this.classId, this.subjectId)
-    ]);
-
-    if (qRes.success && Array.isArray(qRes.questions) && qRes.questions.length) {
-      this.questions = qRes.questions as any[];
-      this.refreshDisplayQuestions();
-      if (subject) {
-        subject.questions = this.questions;
-        void LocalDataService.save();
-      }
-    }
-
-    if (this.topicOptions.length && !this.topicOptions.includes(this.selectedTopic)) {
-      this.selectedTopic = this.topicOptions[0];
-    }
-
-    if (!this.topicOptions.length) {
-      await this.presentAlert(
-        'No topics found. Please add and Save TOS first, then open Question Generator again.'
-      );
-      return;
-    }
-
-    if (!this.questions.length) {
-      this.generateQuestions();
-    }
+  if (
+    this.topicOptions.length &&
+    !this.topicOptions.includes(this.selectedTopic)
+  ) {
+    this.selectedTopic =
+      this.topicOptions[0];
   }
+
+  // ============================================================
+  // 3. LOAD TOS + QUESTIONS FROM FIREBASE
+  // ============================================================
+
+  const [
+    tosRes,
+    qRes
+  ] = await Promise.all([
+    this.loadTosFromFirebase(),
+
+    this.teacherService.loadSubjectQuestions(
+      this.classId,
+      this.subjectId
+    )
+  ]);
+
+  // ============================================================
+  // 4. CHECK THAT TOS EXISTS
+  // ============================================================
+
+  if (!this.tos.length) {
+    await this.presentAlert(
+      'No topics found. Please add and Save TOS first, then open Question Generator again.'
+    );
+    return;
+  }
+
+  // ============================================================
+  // 5. CALCULATE THE CURRENT TOS TOTAL
+  // ============================================================
+
+  const totalPlannedItems =
+    this.tos.reduce(
+      (sum: number, row: any) => {
+
+        const planned =
+          Math.max(
+            0,
+            Math.floor(
+              Number(
+                row.expectedItems || 0
+              )
+            )
+          );
+
+        return sum + planned;
+      },
+      0
+    );
+
+  console.log(
+    '========================================'
+  );
+
+  console.log(
+    'QUESTION GENERATOR INITIALIZATION'
+  );
+
+  console.log(
+    'TOS rows:',
+    this.tos
+  );
+
+  console.log(
+    'TOS planned items:',
+    totalPlannedItems
+  );
+
+  // ============================================================
+  // 6. GET FIREBASE QUESTIONS
+  // ============================================================
+
+  const firebaseQuestions =
+    qRes.success &&
+    Array.isArray(qRes.questions)
+      ? qRes.questions as any[]
+      : [];
+
+  console.log(
+    'Firebase questions:',
+    firebaseQuestions.length
+  );
+
+  // ============================================================
+  // 7. USE FIREBASE QUESTIONS ONLY IF THEIR COUNT MATCHES
+  //    THE CURRENT TOS.
+  //
+  //    Otherwise, rebuild the question slots from the TOS.
+  // ============================================================
+
+  if (
+    totalPlannedItems > 0 &&
+    firebaseQuestions.length === totalPlannedItems
+  ) {
+
+    console.log(
+      'Firebase question count matches TOS.'
+    );
+
+    this.questions =
+      firebaseQuestions;
+
+  } else {
+
+    console.log(
+      'Firebase question count does NOT match TOS.'
+    );
+
+    console.log(
+      `Expected ${totalPlannedItems}, ` +
+      `but received ${firebaseQuestions.length}.`
+    );
+
+    console.log(
+      'Rebuilding question slots from TOS...'
+    );
+
+    this.generateQuestions();
+  }
+
+  // ============================================================
+  // 8. SAVE CURRENT QUESTION SLOTS LOCALLY
+  // ============================================================
+
+  if (subject) {
+
+    subject.questions =
+      this.questions;
+
+    await LocalDataService.save();
+  }
+
+  this.refreshDisplayQuestions();
+
+  console.log(
+    'Final question count:',
+    this.questions.length
+  );
+
+  console.log(
+    '========================================'
+  );
+}
 
   private refreshDisplayQuestions() {
     const selected = String(this.selectedTopic || '').trim();
@@ -425,7 +570,7 @@ export class QuestionGeneratorPage implements OnInit {
       answer: '',
     };
   }
-
+/*
   generateQuestions() {
     this.questions = [];
 
@@ -446,10 +591,15 @@ export class QuestionGeneratorPage implements OnInit {
       }))
       .filter((t) => !!t.topicName);
 
-    const selected = String(this.selectedTopic || '').trim();
-    const activeTos = this.topicViewMode === 'selected'
-      ? normalizedTos.filter(t => t.topicName === selected)
-      : normalizedTos;
+    //const selected = String(this.selectedTopic || '').trim();
+    //const activeTos = this.topicViewMode === 'selected'
+      //? normalizedTos.filter(t => t.topicName === selected)
+      //: normalizedTos;
+
+      // Question slots must always represent the complete exam.
+    // The topicViewMode is only for displaying/filtering questions,
+    // not for determining the total exam question count.
+    const activeTos = normalizedTos;
 
     // To keep question order stable and avoid collisions in seeded generation,
     // number items per (topic, competency, level) group.
@@ -479,6 +629,304 @@ export class QuestionGeneratorPage implements OnInit {
 
     this.refreshDisplayQuestions();
   }
+  */
+generateQuestions() {
+  this.questions = [];
+
+  const cognitiveLevels = [
+    'remembering',
+    'understanding',
+    'applying',
+    'analyzing',
+    'evaluating',
+    'creating'
+  ] as const;
+
+  const normalizedTos = (Array.isArray(this.tos) ? this.tos : [])
+    .map((t) => ({
+      ...t,
+      topicName: String(t.topicName || '').trim(),
+      learningCompetency: String(t.learningCompetency || '').trim(),
+    }))
+    .filter((t) => !!t.topicName);
+
+  // IMPORTANT:
+  // Question generation is for the COMPLETE exam.
+  // Do not use selected-topic filtering here.
+  const activeTos = normalizedTos;
+
+  const counters = new Map<string, number>();
+
+  console.log('========================================');
+  console.log('GENERATING QUESTION SLOTS FROM TOS');
+  console.log('========================================');
+
+  for (const entry of activeTos) {
+
+    // ============================================================
+    // 1. PLANNED ITEMS IS THE AUTHORITATIVE QUESTION COUNT
+    // ============================================================
+
+    const plannedItems = Math.max(
+      0,
+      Math.floor(
+        Number((entry as any).expectedItems || 0)
+      )
+    );
+
+    if (plannedItems <= 0) {
+      console.warn(
+        `Topic "${entry.topicName}" has 0 planned items.`
+      );
+      continue;
+    }
+
+    // ============================================================
+    // 2. GET TEACHER-ENTERED BLOOM COUNTS
+    // ============================================================
+
+    const bloomCounts = {
+      remembering: Math.max(
+        0,
+        Math.floor(
+          Number((entry as any).remembering || 0)
+        )
+      ),
+
+      understanding: Math.max(
+        0,
+        Math.floor(
+          Number((entry as any).understanding || 0)
+        )
+      ),
+
+      applying: Math.max(
+        0,
+        Math.floor(
+          Number((entry as any).applying || 0)
+        )
+      ),
+
+      analyzing: Math.max(
+        0,
+        Math.floor(
+          Number((entry as any).analyzing || 0)
+        )
+      ),
+
+      evaluating: Math.max(
+        0,
+        Math.floor(
+          Number((entry as any).evaluating || 0)
+        )
+      ),
+
+      creating: Math.max(
+        0,
+        Math.floor(
+          Number((entry as any).creating || 0)
+        )
+      )
+    };
+
+    const bloomTotal =
+      bloomCounts.remembering +
+      bloomCounts.understanding +
+      bloomCounts.applying +
+      bloomCounts.analyzing +
+      bloomCounts.evaluating +
+      bloomCounts.creating;
+
+    // ============================================================
+    // 3. VALIDATE BLOOM TOTAL
+    // ============================================================
+
+    if (bloomTotal > plannedItems) {
+      console.error(
+        `Invalid TOS: "${entry.topicName}" has ` +
+        `${bloomTotal} Bloom items but only ` +
+        `${plannedItems} planned items.`
+      );
+
+      continue;
+    }
+
+    const remainingItems =
+      plannedItems - bloomTotal;
+
+    console.log(
+      `Topic: ${entry.topicName}`
+    );
+
+    console.log(
+      `Planned: ${plannedItems}`
+    );
+
+    console.log(
+      `Teacher Bloom: ${bloomTotal}`
+    );
+
+    console.log(
+      `Unassigned: ${remainingItems}`
+    );
+
+    // ============================================================
+    // 4. CREATE SLOTS FOR TEACHER-ASSIGNED BLOOM LEVELS
+    // ============================================================
+
+    for (const level of cognitiveLevels) {
+
+      const count =
+        bloomCounts[level];
+
+      if (count <= 0) {
+        continue;
+      }
+
+      const key =
+        `${entry.topicName}|||` +
+        `${entry.learningCompetency}|||` +
+        `${level}`;
+
+      const start =
+        counters.get(key) || 0;
+
+      for (let j = 1; j <= count; j++) {
+
+        const n =
+          start + j;
+
+        const built =
+          this.buildTemplateQuestion(
+            entry.topicName,
+            entry.learningCompetency,
+            level,
+            n
+          );
+
+        this.questions.push({
+          topic:
+            entry.topicName,
+
+          competency:
+            entry.learningCompetency,
+
+          level,
+
+          question:
+            built.question,
+
+          choices:
+            built.choices,
+
+          answer:
+            built.answer
+        });
+      }
+
+      counters.set(
+        key,
+        start + count
+      );
+    }
+
+    // ============================================================
+    // 5. CREATE THE REMAINING PLANNED SLOTS
+    //
+    // These are deliberately UNASSIGNED.
+    // AI will decide their Bloom levels later.
+    // ============================================================
+
+    for (let j = 0; j < remainingItems; j++) {
+
+      this.questions.push({
+        topic:
+          entry.topicName,
+
+        competency:
+          entry.learningCompetency,
+
+        level:
+          'unassigned',
+
+        question:
+          `Question ${this.questions.length + 1}`,
+
+        choices: {
+          A: '',
+          B: '',
+          C: '',
+          D: ''
+        },
+
+        answer:
+          ''
+      });
+    }
+
+    // ============================================================
+    // 6. VERIFY THIS TOPIC CREATED EXACTLY PLANNED ITEMS
+    // ============================================================
+
+    const topicQuestionCount =
+      this.questions.filter(
+        (q: any) =>
+          q.topic === entry.topicName &&
+          q.competency === entry.learningCompetency
+      ).length;
+
+    console.log(
+      `Generated for "${entry.topicName}": ` +
+      `${topicQuestionCount}/${plannedItems}`
+    );
+  }
+
+  // ============================================================
+  // 7. FINAL TOTAL
+  // ============================================================
+
+  const totalPlannedItems =
+    activeTos.reduce(
+      (sum, row: any) =>
+        sum +
+        Math.max(
+          0,
+          Math.floor(
+            Number(row.expectedItems || 0)
+          )
+        ),
+      0
+    );
+
+  console.log('----------------------------------------');
+
+  console.log(
+    'TOTAL TOS PLANNED ITEMS:',
+    totalPlannedItems
+  );
+
+  console.log(
+    'TOTAL QUESTION SLOTS GENERATED:',
+    this.questions.length
+  );
+
+  console.log('----------------------------------------');
+
+  if (
+    totalPlannedItems !==
+    this.questions.length
+  ) {
+    console.error(
+      `QUESTION SLOT MISMATCH: ` +
+      `TOS=${totalPlannedItems}, ` +
+      `QUESTIONS=${this.questions.length}`
+    );
+  }
+
+  console.log('========================================');
+
+  this.refreshDisplayQuestions();
+}
 async printQuestions() {
   const list = (this.displayQuestions || []).filter(
     (q) => String(q?.question || '').trim()
@@ -798,7 +1246,7 @@ Read each question carefully, choose the best answer, and mark it clearly on you
       this.isPromptingAI = false;
     }
   }
-
+/*
   async generateWithAI() {
     if (this.isGeneratingAI) return;
 
@@ -875,7 +1323,577 @@ Read each question carefully, choose the best answer, and mark it clearly on you
       this.isGeneratingAI = false;
     }
   }
+    */
+async generateWithAI() {
+  if (this.isGeneratingAI) return;
 
+  if (!this.questions.length) {
+    await this.presentAlert('No questions to generate.');
+    return;
+  }
+
+  this.isGeneratingAI = true;
+
+  try {
+    const fn = httpsCallable(
+      firebaseFunctions(),
+      'generateQuestionsWithAI'
+    ) as any;
+
+    // ============================================================
+    // 1. BUILD THE BLOOM INFORMATION FROM THE TOS
+    // ============================================================
+
+    const cognitiveLevels = [
+      'remembering',
+      'understanding',
+      'applying',
+      'analyzing',
+      'evaluating',
+      'creating'
+    ] as const;
+
+    const bloomByTopic = new Map<string, {
+      topic: string;
+      competency: string;
+      plannedItems: number;
+      existingBloom: {
+        remembering: number;
+        understanding: number;
+        applying: number;
+        analyzing: number;
+        evaluating: number;
+        creating: number;
+      };
+      bloomTotal: number;
+      remainingItems: number;
+    }>();
+
+    for (const row of this.tos || []) {
+      const topic = String(row.topicName || '').trim();
+
+      if (!topic) continue;
+
+      const competency =
+        String(row.learningCompetency || '').trim();
+
+      const plannedItems =
+        Math.max(
+          0,
+          Math.floor(
+            Number(row.expectedItems || 0)
+          )
+        );
+
+      const existingBloom = {
+        remembering: Math.max(
+          0,
+          Math.floor(
+            Number(row.remembering || 0)
+          )
+        ),
+
+        understanding: Math.max(
+          0,
+          Math.floor(
+            Number(row.understanding || 0)
+          )
+        ),
+
+        applying: Math.max(
+          0,
+          Math.floor(
+            Number(row.applying || 0)
+          )
+        ),
+
+        analyzing: Math.max(
+          0,
+          Math.floor(
+            Number(row.analyzing || 0)
+          )
+        ),
+
+        evaluating: Math.max(
+          0,
+          Math.floor(
+            Number(row.evaluating || 0)
+          )
+        ),
+
+        creating: Math.max(
+          0,
+          Math.floor(
+            Number(row.creating || 0)
+          )
+        )
+      };
+
+      const bloomTotal =
+        existingBloom.remembering +
+        existingBloom.understanding +
+        existingBloom.applying +
+        existingBloom.analyzing +
+        existingBloom.evaluating +
+        existingBloom.creating;
+
+      const remainingItems =
+        plannedItems - bloomTotal;
+
+      // ----------------------------------------------------------
+      // Do not silently fix an invalid TOS.
+      // ----------------------------------------------------------
+
+      if (remainingItems < 0) {
+        throw new Error(
+          `Topic "${topic}" has ${bloomTotal} Bloom items, ` +
+          `but only ${plannedItems} planned items. ` +
+          `Please reduce the Bloom counts before generating questions.`
+        );
+      }
+
+      const key =
+        `${topic}|||${competency}`;
+
+      bloomByTopic.set(key, {
+        topic,
+        competency,
+        plannedItems,
+        existingBloom,
+        bloomTotal,
+        remainingItems
+      });
+    }
+
+    // ============================================================
+    // 2. CHECK THAT QUESTION COUNT MATCHES THE TOS
+    // ============================================================
+
+    let totalPlannedItems = 0;
+
+    for (const item of bloomByTopic.values()) {
+      totalPlannedItems += item.plannedItems;
+    }
+
+    if (
+      totalPlannedItems > 0 &&
+      this.questions.length !== totalPlannedItems
+    ) {
+      await this.presentAlert(
+        `Your TOS plans ${totalPlannedItems} items, ` +
+        `but the Question Generator currently has ${this.questions.length} questions.\n\n` +
+        `Please generate the question slots again before using AI.`
+      );
+
+      return;
+    }
+
+    // ============================================================
+    // 3. BUILD THE COMPLETE BLOOM INFORMATION FOR GEMINI
+    // ============================================================
+
+    const bloomPlan = Array.from(
+      bloomByTopic.values()
+    ).map(item => ({
+      topic: item.topic,
+      competency: item.competency,
+      plannedItems: item.plannedItems,
+
+      existingBloom: item.existingBloom,
+
+      bloomTotal: item.bloomTotal,
+
+      remainingItems: item.remainingItems
+    }));
+
+    // ============================================================
+    // 4. SEND ALL QUESTIONS IN ONE GEMINI REQUEST
+    // ============================================================
+
+    const request = {
+      mode: 'mcq',
+
+      // Tell the backend that this is a complete exam-generation
+      // request rather than a single cognitive-level group.
+      examMode: true,
+
+      // Total number of questions currently prepared.
+      count: this.questions.length,
+
+      // Send the TOS/Bloom information.
+      bloomPlan,
+
+      // Send the existing template questions so Gemini knows
+      // exactly which questions it needs to replace.
+      questions: this.questions.map(
+        (q: any, index: number) => ({
+          index,
+
+          topic:
+            String(q.topic || '').trim(),
+
+          competency:
+            String(q.competency || '').trim(),
+
+          level:
+            String(q.level || '').trim(),
+
+          question:
+            String(q.question || '').trim()
+        })
+      )
+    };
+
+    console.log(
+      '=== AI EXAM GENERATION REQUEST ==='
+    );
+
+    console.log(
+      'Question count:',
+      this.questions.length
+    );
+
+    console.log(
+      'Bloom plan:',
+      bloomPlan
+    );
+
+    // ============================================================
+    // 5. ONE CALL TO FIREBASE / GEMINI
+    // ============================================================
+
+    const res = await fn(request);
+
+    console.log(
+      '=== AI EXAM GENERATION RESPONSE ===',
+      res?.data
+    );
+
+    const data =
+      res?.data || {};
+
+    // ============================================================
+    // 6. APPLY AI BLOOM SUGGESTIONS
+    // ============================================================
+
+    const bloomSuggestions =
+      Array.isArray(data?.bloomSuggestions)
+        ? data.bloomSuggestions
+        : [];
+
+    for (const suggestion of bloomSuggestions) {
+
+      const topic =
+        String(
+          suggestion?.topic || ''
+        ).trim();
+
+      const competency =
+        String(
+          suggestion?.competency || ''
+        ).trim();
+
+      const key =
+        `${topic}|||${competency}`;
+
+      const target =
+        bloomByTopic.get(key);
+
+      if (!target) {
+        console.warn(
+          'AI returned Bloom suggestion for unknown topic:',
+          suggestion
+        );
+
+        continue;
+      }
+
+      const suggestionBloom = {
+        remembering: Number(
+          suggestion?.bloom?.remembering || 0
+        ),
+
+        understanding: Number(
+          suggestion?.bloom?.understanding || 0
+        ),
+
+        applying: Number(
+          suggestion?.bloom?.applying || 0
+        ),
+
+        analyzing: Number(
+          suggestion?.bloom?.analyzing || 0
+        ),
+
+        evaluating: Number(
+          suggestion?.bloom?.evaluating || 0
+        ),
+
+        creating: Number(
+          suggestion?.bloom?.creating || 0
+        )
+      };
+
+      const suggestionTotal =
+        suggestionBloom.remembering +
+        suggestionBloom.understanding +
+        suggestionBloom.applying +
+        suggestionBloom.analyzing +
+        suggestionBloom.evaluating +
+        suggestionBloom.creating;
+
+      // ----------------------------------------------------------
+      // Validate the AI suggestion on the frontend too.
+      // ----------------------------------------------------------
+
+      if (
+        suggestionTotal !==
+        target.remainingItems
+      ) {
+        throw new Error(
+          `AI Bloom suggestion for "${topic}" ` +
+          `contains ${suggestionTotal} items, ` +
+          `but ${target.remainingItems} were required.`
+        );
+      }
+
+      // ----------------------------------------------------------
+      // IMPORTANT:
+      // Add the AI values to the teacher's existing values.
+      // Never replace them.
+      // ----------------------------------------------------------
+
+      const tosRow =
+        (this.tos || []).find(
+          (row: any) =>
+            String(row.topicName || '').trim() === topic &&
+            String(row.learningCompetency || '').trim() === competency
+        );
+
+      if (!tosRow) {
+        console.warn(
+          'Could not find TOS row for AI Bloom suggestion:',
+          suggestion
+        );
+
+        continue;
+      }
+
+      for (const level of cognitiveLevels) {
+
+        const existingValue =
+          Number(
+            (tosRow as any)[level] || 0
+          );
+
+        const aiValue =
+          Number(
+            (suggestionBloom as any)[level] || 0
+          );
+
+        (tosRow as any)[level] =
+          existingValue + aiValue;
+      }
+    }
+
+    // ============================================================
+    // 7. APPLY GENERATED QUESTIONS
+    // ============================================================
+
+    const generatedQuestions =
+      Array.isArray(data?.questions)
+        ? data.questions
+        : [];
+
+    if (!generatedQuestions.length) {
+      throw new Error(
+        'Gemini did not return any questions.'
+      );
+    }
+
+    for (
+      let i = 0;
+      i < this.questions.length;
+      i++
+    ) {
+
+      const generated =
+        generatedQuestions[i];
+
+      if (
+        !generated ||
+        typeof generated !== 'object'
+      ) {
+        continue;
+      }
+
+      const qText =
+        String(
+          generated.question || ''
+        ).trim();
+
+      const choices =
+        generated.choices &&
+        typeof generated.choices === 'object'
+          ? generated.choices
+          : {};
+
+      const A =
+        String(
+          choices.A || ''
+        ).trim();
+
+      const B =
+        String(
+          choices.B || ''
+        ).trim();
+
+      const C =
+        String(
+          choices.C || ''
+        ).trim();
+
+      const D =
+        String(
+          choices.D || ''
+        ).trim();
+
+      const answer =
+        this.normalizeAnswerLetter(
+          generated.answer
+        );
+
+            if (qText) {
+        this.questions[i].question = qText;
+      }
+
+      this.questions[i].choices = {
+        A,
+        B,
+        C,
+        D
+      };
+
+      this.questions[i].answer = answer;
+
+      // =========================================================
+      // APPLY THE BLOOM LEVEL RETURNED BY GEMINI
+      // =========================================================
+
+      const currentLevel = String(
+        this.questions[i].level || ''
+      )
+        .trim()
+        .toLowerCase();
+
+      const aiLevel = String(
+        generated.level || ''
+      )
+        .trim()
+        .toLowerCase();
+
+      const unassignedValues = [
+        '',
+        'unassigned',
+        'pending',
+        'not assigned'
+      ];
+
+      const wasUnassigned =
+        unassignedValues.includes(currentLevel);
+
+      // Only AI-fill levels that were previously unassigned.
+      // Preserve any Bloom level already assigned by the teacher.
+      if (wasUnassigned) {
+
+        const assignedLevel = cognitiveLevels.find(
+          level => level === aiLevel
+        );
+
+        if (!assignedLevel) {
+          throw new Error(
+            `Gemini did not return a valid Bloom level for question ${i + 1}. ` +
+            `Received: "${generated.level || 'empty'}".`
+          );
+        }
+
+        // Update the question's actual Bloom level.
+        this.questions[i].level = assignedLevel;
+
+        // Mark that the level was assigned by AI.
+        this.questions[i].levelSource = 'ai';
+      }
+    // ============================================================
+    // 8. REFRESH THE QUESTION DISPLAY
+    // ============================================================
+
+    this.refreshDisplayQuestions();
+
+    console.log(
+      '=== AI GENERATION COMPLETE ==='
+    );
+
+    console.log(
+      'Final TOS:',
+      this.tos
+    );
+
+    console.log(
+      'Final question count:',
+      this.questions.length
+    );
+  }
+  } catch (e: any) {
+
+    console.error(
+      'AI generation failed:',
+      e
+    );
+
+    const code =
+      e?.code
+        ? String(e.code)
+        : '';
+
+    const message =
+      e?.message
+        ? String(e.message)
+        : String(e);
+
+    const details =
+      e?.details
+        ? (
+            typeof e.details === 'string'
+              ? e.details
+              : JSON.stringify(e.details)
+          )
+        : '';
+
+    if (
+      code ===
+      'functions/resource-exhausted'
+    ) {
+
+      await this.presentAlert(
+        'Gemini quota/rate limit exceeded.\n\n' +
+        'Your current questions were kept.\n' +
+        'Please wait and try again, or check your Gemini API quota/billing.'
+      );
+
+    } else {
+
+      await this.presentAlert(
+        [code, message, details]
+          .filter(Boolean)
+          .join('\n')
+      );
+    }
+
+  } finally {
+
+    this.isGeneratingAI = false;
+  }
+}
   async onPdfFileSelected(event: Event) {
     const input = event.target as HTMLInputElement | null;
     const file = input?.files && input.files.length ? input.files[0] : null;

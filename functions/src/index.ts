@@ -918,7 +918,7 @@ export const api = functions.https.onRequest(apiApp);
 // });
 
 
-
+/*
 export const generateQuestionsWithAI = functions
   .https
   .onCall(async (data) => {
@@ -1128,7 +1128,1817 @@ export const generateQuestionsWithAI = functions
   }
 
 });
+*/
+export const generateQuestionsWithAI = functions
+  .https
+  .onCall(async (data) => {
 
+  const apiKey = getGeminiApiKey();
+
+  if (!apiKey) {
+    throw new HttpsError(
+      "failed-precondition",
+      "Missing Gemini API key. Set it with: firebase functions:config:set gemini.key=\"YOUR_KEY\""
+    );
+  }
+
+  // ============================================================
+  // BASIC INPUTS
+  // ============================================================
+
+  const mode = String(data?.mode || "mcq").trim();
+  const examMode = data?.examMode === true;
+
+  const topic = String(data?.topic || "").trim();
+  const competency = String(data?.competency || "").trim();
+  const cognitiveLevel = String(data?.cognitiveLevel || "").trim();
+
+  const count = Number(data?.count ?? 5);
+  const customPrompt = String(data?.prompt || "").trim();
+
+  // ============================================================
+  // NORMALIZE NUMBER
+  // ============================================================
+
+  const normalizeNonNegativeInt = (
+    value: any
+  ): number => {
+
+    const n = Number(value);
+
+    if (
+      !Number.isFinite(n) ||
+      n < 0
+    ) {
+      return 0;
+    }
+
+    return Math.floor(n);
+  };
+
+  // ============================================================
+  // NEW EXAM MODE
+  //
+  // This is the important new part.
+  //
+  // The frontend sends:
+  //
+  // examMode: true
+  // bloomPlan: [...]
+  // questions: [...]
+  //
+  // Gemini handles Bloom completion + all questions
+  // in ONE request.
+  // ============================================================
+
+  if (examMode) {
+
+    // ----------------------------------------------------------
+    // Validate mode
+    // ----------------------------------------------------------
+
+    if (mode !== "mcq") {
+      throw new HttpsError(
+        "invalid-argument",
+        "Exam mode currently supports MCQ generation only."
+      );
+    }
+
+    // ----------------------------------------------------------
+    // Get Bloom plan
+    // ----------------------------------------------------------
+
+    const rawBloomPlan =
+      Array.isArray(data?.bloomPlan)
+        ? data.bloomPlan
+        : [];
+
+    if (!rawBloomPlan.length) {
+      throw new HttpsError(
+        "invalid-argument",
+        "bloomPlan is required in exam mode."
+      );
+    }
+
+    // ----------------------------------------------------------
+    // Get question slots
+    // ----------------------------------------------------------
+
+    const rawQuestions =
+      Array.isArray(data?.questions)
+        ? data.questions
+        : [];
+
+    if (!rawQuestions.length) {
+      throw new HttpsError(
+        "invalid-argument",
+        "questions are required in exam mode."
+      );
+    }
+
+    const maxQuestions = 100;
+
+    if (rawQuestions.length > maxQuestions) {
+      throw new HttpsError(
+        "invalid-argument",
+        `Exam generation is limited to ${maxQuestions} questions.`
+      );
+    }
+
+    // ----------------------------------------------------------
+    // Normalize Bloom plan
+    // ----------------------------------------------------------
+
+    const bloomPlan = rawBloomPlan.map(
+      (item: any) => {
+
+        const topicName =
+          String(
+            item?.topic || ""
+          ).trim();
+
+        const learningCompetency =
+          String(
+            item?.competency || ""
+          ).trim();
+
+        const plannedItems =
+          normalizeNonNegativeInt(
+            item?.plannedItems
+          );
+
+        const existingBloom = {
+          remembering:
+            normalizeNonNegativeInt(
+              item?.existingBloom?.remembering
+            ),
+
+          understanding:
+            normalizeNonNegativeInt(
+              item?.existingBloom?.understanding
+            ),
+
+          applying:
+            normalizeNonNegativeInt(
+              item?.existingBloom?.applying
+            ),
+
+          analyzing:
+            normalizeNonNegativeInt(
+              item?.existingBloom?.analyzing
+            ),
+
+          evaluating:
+            normalizeNonNegativeInt(
+              item?.existingBloom?.evaluating
+            ),
+
+          creating:
+            normalizeNonNegativeInt(
+              item?.existingBloom?.creating
+            ),
+        };
+
+        const bloomTotal =
+          existingBloom.remembering +
+          existingBloom.understanding +
+          existingBloom.applying +
+          existingBloom.analyzing +
+          existingBloom.evaluating +
+          existingBloom.creating;
+
+        const remainingItems =
+          plannedItems - bloomTotal;
+
+        return {
+          topic: topicName,
+          competency: learningCompetency,
+          plannedItems,
+          existingBloom,
+          bloomTotal,
+          remainingItems
+        };
+      }
+    );
+
+    // ----------------------------------------------------------
+    // Validate Bloom plan
+    // ----------------------------------------------------------
+
+    for (
+      const item of bloomPlan
+    ) {
+
+      if (!item.topic) {
+        throw new HttpsError(
+          "invalid-argument",
+          "Every Bloom plan entry must have a topic."
+        );
+      }
+
+      if (
+        item.bloomTotal >
+        item.plannedItems
+      ) {
+        throw new HttpsError(
+          "invalid-argument",
+          `Topic "${item.topic}" has ${item.bloomTotal} Bloom items but only ${item.plannedItems} planned items.`
+        );
+      }
+    }
+
+    // ----------------------------------------------------------
+    // Validate question count against TOS
+    // ----------------------------------------------------------
+
+    const totalPlannedItems =
+      bloomPlan.reduce(
+        (
+          sum: number,
+          item: any
+        ) =>
+          sum +
+          item.plannedItems,
+        0
+      );
+
+    if (
+      totalPlannedItems > 0 &&
+      rawQuestions.length !==
+        totalPlannedItems
+    ) {
+      throw new HttpsError(
+        "invalid-argument",
+        `TOS plans ${totalPlannedItems} items, but ${rawQuestions.length} question slots were supplied.`
+      );
+    }
+
+    // ----------------------------------------------------------
+    // Build question slot list
+    // ----------------------------------------------------------
+
+    const questionSlots =
+      rawQuestions.map(
+        (
+          q: any,
+          index: number
+        ) => ({
+
+          index,
+
+          topic:
+            String(
+              q?.topic || ""
+            ).trim(),
+
+          competency:
+            String(
+              q?.competency || ""
+            ).trim(),
+
+          level:
+            String(
+              q?.level || ""
+            ).trim(),
+
+          question:
+            String(
+              q?.question || ""
+            ).trim()
+        })
+      );
+
+    // ==========================================================
+    // BUILD EXAM PROMPT
+    // ==========================================================
+
+  let examPrompt =
+    `You are an expert educational assessment generator.\n\n` +
+
+    `Generate a complete multiple-choice exam based on the provided TOS blueprint.\n\n` +
+
+    `IMPORTANT RULES:\n` +
+    `1. Preserve all teacher-entered Bloom's Taxonomy counts exactly.\n` +
+    `2. If a topic has unassigned Bloom items, determine the distribution ONLY for those remaining items.\n` +
+    `3. In "bloomSuggestions", the Bloom counts should represent ONLY the missing/unassigned items, NOT the teacher-entered Bloom counts.\n` +
+    `4. The sum of each "bloomSuggestions" Bloom distribution MUST equal the "remainingItems" value in the TOS BLUEPRINT.\n` +
+    `5. Never change, reduce, or reinterpret the teacher's existing Bloom counts.\n` +
+    `6. Every topic's final Bloom distribution MUST equal its planned item count.\n` +
+    `7. Every generated question MUST correspond to one supplied question slot.\n` +
+    `8. Preserve the supplied question slot index.\n` +
+    `9. Return exactly one generated question for every question slot.\n` +
+    `10. Each question must have exactly four choices: A, B, C, and D.\n` +
+    `11. The answer must be exactly A, B, C, or D.\n` +
+    `12. For teacher-assigned slots, preserve the supplied Bloom level exactly. For unassigned slots, choose a valid Bloom level based on the missing Bloom distribution.\n` +
+    `13. Return ONLY valid JSON. Do not include markdown or explanations.\n\n`;
+    // ----------------------------------------------------------
+    // TOS BLUEPRINT
+    // ----------------------------------------------------------
+
+    examPrompt +=
+      `TOS BLUEPRINT:\n` +
+      JSON.stringify(
+        bloomPlan,
+        null,
+        2
+      ) +
+      `\n\n`;
+
+    // ----------------------------------------------------------
+    // QUESTION SLOTS
+    // ----------------------------------------------------------
+
+    examPrompt +=
+      `QUESTION SLOTS:\n` +
+      JSON.stringify(
+        questionSlots,
+        null,
+        2
+      ) +
+      `\n\n`;
+
+    // ----------------------------------------------------------
+    // OUTPUT FORMAT
+    // ----------------------------------------------------------
+
+    examPrompt +=
+      `RETURN THIS EXACT JSON STRUCTURE:\n` +
+      `{\n` +
+      `  "bloomSuggestions": [\n` +
+      `    {\n` +
+      `      "topic": "...",\n` +
+      `      "competency": "...",\n` +
+      `      "bloom": {\n` +
+      `        "remembering": 0,\n` +
+      `        "understanding": 0,\n` +
+      `        "applying": 0,\n` +
+      `        "analyzing": 0,\n` +
+      `        "evaluating": 0,\n` +
+      `        "creating": 0\n` +
+      `      }\n` +
+      `    }\n` +
+      `  ],\n` +
+      `  "questions": [\n` +
+      `    {\n` +
+      `      "index": 0,\n` +
+      `      "topic": "...",\n` +
+      `      "competency": "...",\n` +
+      `      "level": "...",\n` +
+      `      "question": "...",\n` +
+      `      "choices": {\n` +
+      `        "A": "...",\n` +
+      `        "B": "...",\n` +
+      `        "C": "...",\n` +
+      `        "D": "..."\n` +
+      `      },\n` +
+      `      "answer": "A"\n` +
+      `    }\n` +
+      `  ]\n` +
+      `}\n\n`;
+
+    // ==========================================================
+    // GEMINI MODEL DISCOVERY
+    // ==========================================================
+
+    const listUrl =
+      "https://generativelanguage.googleapis.com/v1beta/models?key=" +
+      encodeURIComponent(
+        String(apiKey)
+      );
+
+    const modelPreference = [
+      "models/gemini-1.5-flash",
+      "models/gemini-1.5-pro",
+      "models/gemini-1.0-pro",
+    ];
+
+    let models: any[] = [];
+    let listModelsErrorText = "";
+
+    try {
+
+      const listResp =
+        await fetch(listUrl);
+
+      if (!listResp.ok) {
+
+        listModelsErrorText =
+          await listResp.text();
+
+      } else {
+
+        const listJson: any =
+          await listResp.json();
+
+        models =
+          Array.isArray(
+            listJson?.models
+          )
+            ? listJson.models
+            : [];
+      }
+
+    } catch (e: any) {
+
+      listModelsErrorText =
+        e?.message
+          ? String(e.message)
+          : String(e);
+    }
+
+    const supported =
+      models.filter(
+        (m) =>
+          m &&
+          typeof m === "object" &&
+          typeof m.name === "string" &&
+          Array.isArray(
+            m.supportedGenerationMethods
+          ) &&
+          m.supportedGenerationMethods.includes(
+            "generateContent"
+          )
+      );
+
+    const supportedNames =
+      supported.map(
+        (m) =>
+          String(m.name)
+      );
+
+    const preferredSupported =
+      modelPreference.filter(
+        (pref) =>
+          supportedNames.includes(
+            pref
+          )
+      );
+
+    const otherSupported =
+      supportedNames.filter(
+        (name) =>
+          !preferredSupported.includes(
+            name
+          )
+      );
+
+    const modelCandidates = [
+      ...preferredSupported,
+      ...otherSupported
+    ];
+
+    if (
+      modelCandidates.length === 0
+    ) {
+      throw new HttpsError(
+        "failed-precondition",
+        `No Gemini model with generateContent is available for this API key. ListModels error: ${listModelsErrorText || "(none)"}`
+      );
+    }
+
+    // ==========================================================
+    // GEMINI REQUEST
+    // ==========================================================
+
+    const callGemini =
+      async (
+        modelName: string
+      ) => {
+
+        const genUrl =
+          `https://generativelanguage.googleapis.com/v1beta/${modelName}:generateContent?key=` +
+          encodeURIComponent(
+            String(apiKey)
+          );
+
+        return fetch(
+          genUrl,
+          {
+            method: "POST",
+
+            headers: {
+              "Content-Type":
+                "application/json",
+            },
+
+            body: JSON.stringify({
+
+              contents: [
+                {
+                  role: "user",
+
+                  parts: [
+                    {
+                      text:
+                        examPrompt
+                    }
+                  ]
+                }
+              ],
+
+              generationConfig: {
+                temperature: 0.7
+              }
+            })
+          }
+        );
+      };
+
+    let lastErrText = "";
+    let lastStatus:
+      number | undefined;
+
+    let json: any = null;
+
+    for (
+      const modelName
+      of modelCandidates
+    ) {
+
+      const resp =
+        await callGemini(
+          modelName
+        );
+
+      if (resp.ok) {
+
+        json =
+          await resp.json();
+
+        break;
+      }
+
+      lastStatus =
+        resp.status;
+
+      lastErrText =
+        await resp.text();
+
+      if (
+        resp.status === 429
+      ) {
+
+        throw new HttpsError(
+          "resource-exhausted",
+          `Gemini quota/rate limit exceeded. Please wait and try again, or check your Gemini API quota/billing. Details: ${lastErrText}`
+        );
+      }
+
+      const errLower =
+        String(
+          lastErrText || ""
+        ).toLowerCase();
+
+      const isModelNotFound =
+        resp.status === 404 ||
+        errLower.includes(
+          "model not found"
+        ) ||
+        errLower.includes(
+          "is no longer available"
+        ) ||
+        errLower.includes(
+          "not_found"
+        );
+
+      if (
+        isModelNotFound
+      ) {
+        continue;
+      }
+
+      throw new HttpsError(
+        "internal",
+        `Gemini API error: ${lastErrText}`
+      );
+    }
+
+    if (!json) {
+
+      throw new HttpsError(
+        "failed-precondition",
+        `No supported Gemini model succeeded. Last status: ${String(lastStatus ?? "(unknown)")}. Details: ${lastErrText}`
+      );
+    }
+
+    // ==========================================================
+    // GET RESPONSE TEXT
+    // ==========================================================
+
+    const textOut =
+      String(
+        json?.candidates?.[0]
+          ?.content
+          ?.parts?.[0]
+          ?.text || ""
+      ).trim();
+
+    if (!textOut) {
+
+      throw new HttpsError(
+        "internal",
+        "Gemini returned an empty response."
+      );
+    }
+
+    // ==========================================================
+    // PARSE JSON
+    // ==========================================================
+
+    try {
+
+      const extractJsonCandidate =
+        (
+          s: string
+        ): string => {
+
+          const trimmed =
+            String(
+              s || ""
+            ).trim();
+
+          const fenceMatch =
+            trimmed.match(
+              /```(?:json)?\s*([\s\S]*?)\s*```/i
+            );
+
+          if (
+            fenceMatch &&
+            fenceMatch[1]
+          ) {
+
+            return String(
+              fenceMatch[1]
+            ).trim();
+          }
+
+          const firstBrace =
+            trimmed.indexOf(
+              "{"
+            );
+
+          const lastBrace =
+            trimmed.lastIndexOf(
+              "}"
+            );
+
+          if (
+            firstBrace !== -1 &&
+            lastBrace !== -1 &&
+            lastBrace >
+              firstBrace
+          ) {
+
+            return trimmed.slice(
+              firstBrace,
+              lastBrace + 1
+            ).trim();
+          }
+
+          return trimmed;
+        };
+
+      const parsed =
+        JSON.parse(
+          extractJsonCandidate(
+            textOut
+          )
+        );
+
+      // ========================================================
+      // VALIDATE BLOOM SUGGESTIONS
+      // ========================================================
+
+      const rawSuggestions =
+        Array.isArray(
+          parsed?.bloomSuggestions
+        )
+          ? parsed.bloomSuggestions
+          : [];
+
+      const bloomSuggestions:
+        Array<{
+          topic: string;
+          competency: string;
+          bloom: {
+            remembering: number;
+            understanding: number;
+            applying: number;
+            analyzing: number;
+            evaluating: number;
+            creating: number;
+          };
+        }> = [];
+
+      for (
+        const suggestion
+        of rawSuggestions
+      ) {
+
+        const suggestionTopic =
+          String(
+            suggestion?.topic ||
+            ""
+          ).trim();
+
+        const suggestionCompetency =
+          String(
+            suggestion?.competency ||
+            ""
+          ).trim();
+
+        if (
+          !suggestionTopic
+        ) {
+          continue;
+        }
+
+        const bloom = {
+          remembering:
+            normalizeNonNegativeInt(
+              suggestion?.bloom
+                ?.remembering
+            ),
+
+          understanding:
+            normalizeNonNegativeInt(
+              suggestion?.bloom
+                ?.understanding
+            ),
+
+          applying:
+            normalizeNonNegativeInt(
+              suggestion?.bloom
+                ?.applying
+            ),
+
+          analyzing:
+            normalizeNonNegativeInt(
+              suggestion?.bloom
+                ?.analyzing
+            ),
+
+          evaluating:
+            normalizeNonNegativeInt(
+              suggestion?.bloom
+                ?.evaluating
+            ),
+
+          creating:
+            normalizeNonNegativeInt(
+              suggestion?.bloom
+                ?.creating
+            )
+        };
+
+        const suggestionTotal =
+          bloom.remembering +
+          bloom.understanding +
+          bloom.applying +
+          bloom.analyzing +
+          bloom.evaluating +
+          bloom.creating;
+
+        // Find matching TOS row.
+        const matchingPlan =
+          bloomPlan.find(
+            (
+              item: any
+            ) =>
+              item.topic ===
+                suggestionTopic &&
+              item.competency ===
+                suggestionCompetency
+          );
+
+        if (!matchingPlan) {
+
+          throw new HttpsError(
+            "internal",
+            `Gemini returned a Bloom suggestion for an unknown topic: ${suggestionTopic}`
+          );
+        }
+
+        // AI is ONLY allowed to fill the missing items.
+        // ========================================================
+        // ACCEPT EITHER:
+        // 1. AI returned ONLY the missing Bloom items
+        // 2. AI returned the COMPLETE/final Bloom distribution
+        //
+        // Teacher-entered Bloom counts are NEVER overwritten.
+        // ========================================================
+
+        let missingBloom = {
+          remembering: 0,
+          understanding: 0,
+          applying: 0,
+          analyzing: 0,
+          evaluating: 0,
+          creating: 0
+        };
+
+        // --------------------------------------------------------
+        // CASE 1:
+        // Gemini returned exactly the number of missing items.
+        // --------------------------------------------------------
+
+        if (
+          suggestionTotal ===
+          matchingPlan.remainingItems
+        ) {
+
+          missingBloom = {
+            remembering: bloom.remembering,
+            understanding: bloom.understanding,
+            applying: bloom.applying,
+            analyzing: bloom.analyzing,
+            evaluating: bloom.evaluating,
+            creating: bloom.creating
+          };
+
+        }
+
+        // --------------------------------------------------------
+        // CASE 2:
+        // Gemini returned the COMPLETE final Bloom distribution.
+        //
+        // Example:
+        // Teacher already has 10
+        // Gemini returns 25
+        // We calculate:
+        // Gemini 25 - Teacher 10 = AI missing 15
+        // --------------------------------------------------------
+
+        else if (
+          suggestionTotal ===
+          matchingPlan.plannedItems
+        ) {
+
+          const existing =
+            matchingPlan.existingBloom;
+
+          // Gemini must never reduce a teacher-entered value.
+          const cannotReduceTeacherCount =
+            bloom.remembering < existing.remembering ||
+            bloom.understanding < existing.understanding ||
+            bloom.applying < existing.applying ||
+            bloom.analyzing < existing.analyzing ||
+            bloom.evaluating < existing.evaluating ||
+            bloom.creating < existing.creating;
+
+          if (
+            cannotReduceTeacherCount
+          ) {
+
+            throw new HttpsError(
+              "internal",
+              `Gemini attempted to reduce teacher-entered Bloom counts for "${suggestionTopic}".`
+            );
+          }
+
+          missingBloom = {
+            remembering:
+              bloom.remembering -
+              existing.remembering,
+
+            understanding:
+              bloom.understanding -
+              existing.understanding,
+
+            applying:
+              bloom.applying -
+              existing.applying,
+
+            analyzing:
+              bloom.analyzing -
+              existing.analyzing,
+
+            evaluating:
+              bloom.evaluating -
+              existing.evaluating,
+
+            creating:
+              bloom.creating -
+              existing.creating
+          };
+
+        }
+
+        // --------------------------------------------------------
+        // CASE 3:
+        // Gemini returned neither the missing amount nor
+        // the complete planned amount.
+        // --------------------------------------------------------
+
+        else {
+
+          throw new HttpsError(
+            "internal",
+            `Gemini Bloom suggestion for "${suggestionTopic}" contains ${suggestionTotal} items, but it must contain either ${matchingPlan.remainingItems} missing items or ${matchingPlan.plannedItems} total items.`
+          );
+        }
+
+        // --------------------------------------------------------
+        // Validate the calculated missing Bloom distribution.
+        // --------------------------------------------------------
+
+        const missingTotal =
+          missingBloom.remembering +
+          missingBloom.understanding +
+          missingBloom.applying +
+          missingBloom.analyzing +
+          missingBloom.evaluating +
+          missingBloom.creating;
+
+        if (
+          missingTotal !==
+          matchingPlan.remainingItems
+        ) {
+
+          throw new HttpsError(
+            "internal",
+            `Calculated AI Bloom distribution for "${suggestionTopic}" contains ${missingTotal} items, but ${matchingPlan.remainingItems} were required.`
+          );
+        }
+
+        // --------------------------------------------------------
+        // Validate final Bloom total.
+        // --------------------------------------------------------
+
+        const finalTotal =
+          matchingPlan.bloomTotal +
+          missingTotal;
+
+        if (
+          finalTotal !==
+          matchingPlan.plannedItems
+        ) {
+
+          throw new HttpsError(
+            "internal",
+            `Final Bloom total for "${suggestionTopic}" is ${finalTotal}, but ${matchingPlan.plannedItems} were planned.`
+          );
+        }
+
+        // --------------------------------------------------------
+        // Save ONLY the missing AI Bloom counts.
+        // --------------------------------------------------------
+
+        bloomSuggestions.push({
+          topic:
+            suggestionTopic,
+
+          competency:
+            suggestionCompetency,
+
+          bloom:
+            missingBloom
+        });
+      }
+      // ========================================================
+      // QUESTIONS
+      // ========================================================
+
+      const rawGeneratedQuestions =
+        Array.isArray(
+          parsed?.questions
+        )
+          ? parsed.questions
+          : [];
+
+      if (
+        rawGeneratedQuestions.length !==
+        questionSlots.length
+      ) {
+
+        throw new HttpsError(
+          "internal",
+          `Gemini returned ${rawGeneratedQuestions.length} questions, but ${questionSlots.length} were requested.`
+        );
+      }
+
+      const questions =
+        new Array(
+          questionSlots.length
+        );
+
+      for (
+        let i = 0;
+        i <
+          rawGeneratedQuestions.length;
+        i++
+      ) {
+
+        const generated =
+          rawGeneratedQuestions[i];
+
+        const generatedIndex =
+          Number(
+            generated?.index
+          );
+
+        if (
+          !Number.isInteger(
+            generatedIndex
+          ) ||
+          generatedIndex < 0 ||
+          generatedIndex >=
+            questionSlots.length
+        ) {
+
+          throw new HttpsError(
+            "internal",
+            `Gemini returned an invalid question index at position ${i}.`
+          );
+        }
+
+        const slot =
+          questionSlots[
+            generatedIndex
+          ];
+
+        const question =
+          String(
+            generated?.question ||
+            ""
+          ).trim();
+
+        const choices =
+          generated?.choices &&
+          typeof generated.choices ===
+            "object"
+            ? generated.choices
+            : {};
+
+        const A =
+          String(
+            choices?.A || ""
+          ).trim();
+
+        const B =
+          String(
+            choices?.B || ""
+          ).trim();
+
+        const C =
+          String(
+            choices?.C || ""
+          ).trim();
+
+        const D =
+          String(
+            choices?.D || ""
+          ).trim();
+
+        const answer =
+          String(
+            generated?.answer ||
+            ""
+          )
+            .trim()
+            .toUpperCase();
+
+        if (
+          !question ||
+          !A ||
+          !B ||
+          !C ||
+          !D
+        ) {
+
+          throw new HttpsError(
+            "internal",
+            `Gemini returned an incomplete question for slot ${generatedIndex + 1}.`
+          );
+        }
+
+        if (
+          ![
+            "A",
+            "B",
+            "C",
+            "D"
+          ].includes(
+            answer
+          )
+        ) {
+
+          throw new HttpsError(
+            "internal",
+            `Gemini returned an invalid answer for question ${generatedIndex + 1}.`
+          );
+        }
+// ------------------------------------------------------
+// Verify Gemini did not change the slot metadata.
+// ------------------------------------------------------
+
+const returnedTopic =
+  String(
+    generated?.topic ||
+    ""
+  ).trim();
+
+const returnedCompetency =
+  String(
+    generated?.competency ||
+    ""
+  ).trim();
+
+const returnedLevel =
+  String(
+    generated?.level ||
+    ""
+  ).trim();
+
+if (
+  returnedTopic &&
+  returnedTopic !==
+    slot.topic
+) {
+
+  throw new HttpsError(
+    "internal",
+    `Gemini changed the topic of question ${generatedIndex + 1}.`
+  );
+}
+
+if (
+  returnedCompetency &&
+  returnedCompetency !==
+    slot.competency
+) {
+
+  throw new HttpsError(
+    "internal",
+    `Gemini changed the competency of question ${generatedIndex + 1}.`
+  );
+}
+
+
+// ------------------------------------------------------
+// Bloom level handling
+//
+// Teacher-assigned slots:
+//   Gemini MUST keep the teacher's Bloom level.
+//
+// Unassigned slots:
+//   Gemini is allowed to choose the Bloom level.
+// ------------------------------------------------------
+
+const normalizedSlotLevel =
+  String(
+    slot.level || ""
+  )
+    .trim()
+    .toLowerCase();
+
+const normalizedReturnedLevel =
+  String(
+    returnedLevel || ""
+  )
+    .trim()
+    .toLowerCase();
+
+const unassignedLevels = [
+  "",
+  "unassigned",
+  "pending"
+];
+
+const isUnassignedSlot =
+  unassignedLevels.includes(
+    normalizedSlotLevel
+  );
+
+const validBloomLevels = [
+  "remembering",
+  "understanding",
+  "applying",
+  "analyzing",
+  "evaluating",
+  "creating"
+];
+
+
+// ------------------------------------------------------
+// If teacher already assigned the Bloom level,
+// Gemini must preserve it.
+// ------------------------------------------------------
+if (
+  isUnassignedSlot &&
+  !validBloomLevels.includes(
+    normalizedReturnedLevel
+  )
+) {
+  throw new HttpsError(
+    "internal",
+    `Gemini did not assign a valid Bloom level to question ${generatedIndex + 1}.`
+  );
+}
+
+// ------------------------------------------------------
+// If the slot is unassigned, Gemini MUST provide
+// one valid Bloom level.
+// ------------------------------------------------------
+
+if (
+  isUnassignedSlot &&
+  !validBloomLevels.includes(
+    normalizedReturnedLevel
+  )
+) {
+
+  throw new HttpsError(
+    "internal",
+    `Gemini did not assign a valid Bloom level to question ${generatedIndex + 1}.`
+  );
+}
+
+
+// ------------------------------------------------------
+// Use the teacher's level when assigned.
+// Use Gemini's level when the slot was unassigned.
+// ------------------------------------------------------
+
+const finalLevel =
+  isUnassignedSlot
+    ? normalizedReturnedLevel
+    : slot.level;
+
+      questions[
+        generatedIndex
+      ] = {
+
+        index:
+          generatedIndex,
+
+        topic:
+          slot.topic,
+
+        competency:
+          slot.competency,
+
+        level:
+          finalLevel,
+
+        question,
+
+        choices: {
+          A,
+          B,
+          C,
+          D
+        },
+
+        answer
+      };
+      }
+
+      // --------------------------------------------------------
+      // Make sure there are no missing question slots.
+      // --------------------------------------------------------
+
+      for (
+        let i = 0;
+        i < questions.length;
+        i++
+      ) {
+
+        if (
+          !questions[i]
+        ) {
+
+          throw new HttpsError(
+            "internal",
+            `Gemini did not return question slot ${i + 1}.`
+          );
+        }
+      }
+
+      // ========================================================
+      // SUCCESS
+      // ========================================================
+
+      return {
+        bloomSuggestions,
+        questions
+      };
+
+    } catch (err: any) {
+
+      if (
+        err instanceof HttpsError
+      ) {
+        throw err;
+      }
+
+      console.error(
+        "Failed to parse Gemini exam response:",
+        err
+      );
+
+      throw new HttpsError(
+        "internal",
+        "Gemini returned an invalid exam response. Please try again."
+      );
+    }
+  }
+
+  // ============================================================
+  // EXISTING NON-EXAM MODE
+  //
+  // This preserves your current behavior for:
+  // - normal question generation
+  // - PDF generation
+  // ============================================================
+
+  if (
+    !customPrompt &&
+    (
+      !topic ||
+      !competency ||
+      !cognitiveLevel
+    )
+  ) {
+
+    throw new HttpsError(
+      "invalid-argument",
+      "topic, competency, and cognitiveLevel are required"
+    );
+  }
+
+  const n =
+    Number.isFinite(count) &&
+    count > 0
+      ? Math.min(
+          Math.floor(count),
+          20
+        )
+      : 5;
+
+  const prompt =
+    customPrompt
+      ? (
+          `You are an exam question generator.\n` +
+          `User request: ${customPrompt}\n\n` +
+          `Return ONLY valid JSON.\n` +
+          (
+            mode === "mcq"
+              ? `{"questions":[{"question":"...","choices":{"A":"...","B":"...","C":"...","D":"..."},"answer":"A"}]}`
+              : `{"questions":["...","..."]}`
+          )
+        )
+      : (
+          `Generate ${n} exam questions.\n` +
+          `Topic: ${topic}\n` +
+          `Learning competency: ${competency}\n` +
+          `Bloom level: ${cognitiveLevel}\n\n` +
+          (
+            mode === "mcq"
+              ? (
+                  `Generate multiple-choice questions. Each item MUST include:\n` +
+                  `- question (string)\n` +
+                  `- choices (object with keys A,B,C,D and string values)\n` +
+                  `- answer (one of: "A","B","C","D")\n\n` +
+                  `Return ONLY valid JSON in this exact format:\n` +
+                  `{"questions":[{"question":"...","choices":{"A":"...","B":"...","C":"...","D":"..."},"answer":"A"}]}`
+                )
+              : (
+                  `Return ONLY valid JSON in this exact format:\n` +
+                  `{"questions":["...","..."]}`
+                )
+          )
+        );
+
+  // ============================================================
+  // FIND GEMINI MODELS
+  // ============================================================
+
+  const listUrl =
+    "https://generativelanguage.googleapis.com/v1beta/models?key=" +
+    encodeURIComponent(
+      String(apiKey)
+    );
+
+  const modelPreference = [
+    "models/gemini-1.5-flash",
+    "models/gemini-1.5-pro",
+    "models/gemini-1.0-pro",
+  ];
+
+  let models: any[] = [];
+  let listModelsErrorText = "";
+
+  try {
+
+    const listResp =
+      await fetch(listUrl);
+
+    if (!listResp.ok) {
+
+      listModelsErrorText =
+        await listResp.text();
+
+    } else {
+
+      const listJson: any =
+        await listResp.json();
+
+      models =
+        Array.isArray(
+          listJson?.models
+        )
+          ? listJson.models
+          : [];
+    }
+
+  } catch (e: any) {
+
+    listModelsErrorText =
+      e?.message
+        ? String(e.message)
+        : String(e);
+  }
+
+  const supported =
+    models.filter(
+      (m) =>
+        m &&
+        typeof m === "object" &&
+        typeof m.name === "string" &&
+        Array.isArray(
+          m.supportedGenerationMethods
+        ) &&
+        m.supportedGenerationMethods.includes(
+          "generateContent"
+        )
+    );
+
+  const supportedNames =
+    supported.map(
+      (m) =>
+        String(m.name)
+    );
+
+  const preferredSupported =
+    modelPreference.filter(
+      (pref) =>
+        supportedNames.includes(
+          pref
+        )
+    );
+
+  const otherSupported =
+    supportedNames.filter(
+      (name) =>
+        !preferredSupported.includes(
+          name
+        )
+    );
+
+  const modelCandidates = [
+    ...preferredSupported,
+    ...otherSupported
+  ];
+
+  if (
+    modelCandidates.length === 0
+  ) {
+
+    throw new HttpsError(
+      "failed-precondition",
+      `No Gemini model with generateContent is available for this API key. ListModels error: ${listModelsErrorText || "(none)"}`
+    );
+  }
+
+  // ============================================================
+  // GEMINI CALL
+  // ============================================================
+
+  const callGemini =
+    async (
+      modelName: string
+    ) => {
+
+      const genUrl =
+        `https://generativelanguage.googleapis.com/v1beta/${modelName}:generateContent?key=` +
+        encodeURIComponent(
+          String(apiKey)
+        );
+
+      return fetch(
+        genUrl,
+        {
+          method: "POST",
+
+          headers: {
+            "Content-Type":
+              "application/json"
+          },
+
+          body: JSON.stringify({
+
+            contents: [
+              {
+                role: "user",
+
+                parts: [
+                  {
+                    text:
+                      prompt
+                  }
+                ]
+              }
+            ],
+
+            generationConfig: {
+              temperature: 0.7
+            }
+          })
+        }
+      );
+    };
+
+  let lastErrText = "";
+  let lastStatus:
+    number | undefined;
+
+  let json: any = null;
+
+  for (
+    const modelName
+    of modelCandidates
+  ) {
+
+    const resp =
+      await callGemini(
+        modelName
+      );
+
+    if (resp.ok) {
+
+      json =
+        await resp.json();
+
+      break;
+    }
+
+    lastStatus =
+      resp.status;
+
+    lastErrText =
+      await resp.text();
+
+    if (
+      resp.status === 429
+    ) {
+
+      throw new HttpsError(
+        "resource-exhausted",
+        `Gemini quota/rate limit exceeded. Please wait and try again, or check your Gemini API quota/billing. Details: ${lastErrText}`
+      );
+    }
+
+    const errLower =
+      String(
+        lastErrText || ""
+      ).toLowerCase();
+
+    const isModelNotFound =
+      resp.status === 404 ||
+      errLower.includes(
+        "model not found"
+      ) ||
+      errLower.includes(
+        "is no longer available"
+      ) ||
+      errLower.includes(
+        "not_found"
+      );
+
+    if (
+      isModelNotFound
+    ) {
+      continue;
+    }
+
+    throw new HttpsError(
+      "internal",
+      `Gemini API error: ${lastErrText}`
+    );
+  }
+
+  if (!json) {
+
+    throw new HttpsError(
+      "failed-precondition",
+      `No supported Gemini model succeeded. Last status: ${String(lastStatus ?? "(unknown)")}. Details: ${lastErrText}`
+    );
+  }
+
+  const textOut =
+    String(
+      json?.candidates?.[0]
+        ?.content
+        ?.parts?.[0]
+        ?.text || ""
+    ).trim();
+
+  if (!textOut) {
+
+    return {
+      questions: []
+    };
+  }
+
+  // ============================================================
+  // PARSE EXISTING RESPONSE
+  // ============================================================
+
+  try {
+
+    const extractJsonCandidate =
+      (
+        s: string
+      ): string => {
+
+        const trimmed =
+          String(
+            s || ""
+          ).trim();
+
+        const fenceMatch =
+          trimmed.match(
+            /```(?:json)?\s*([\s\S]*?)\s*```/i
+          );
+
+        if (
+          fenceMatch &&
+          fenceMatch[1]
+        ) {
+
+          return String(
+            fenceMatch[1]
+          ).trim();
+        }
+
+        const firstBrace =
+          trimmed.indexOf(
+            "{"
+          );
+
+        const lastBrace =
+          trimmed.lastIndexOf(
+            "}"
+          );
+
+        if (
+          firstBrace !== -1 &&
+          lastBrace !== -1 &&
+          lastBrace >
+            firstBrace
+        ) {
+
+          return trimmed.slice(
+            firstBrace,
+            lastBrace + 1
+          ).trim();
+        }
+
+        return trimmed;
+      };
+
+    const parsed =
+      JSON.parse(
+        extractJsonCandidate(
+          textOut
+        )
+      );
+
+    if (
+      mode === "mcq"
+    ) {
+
+      const items =
+        Array.isArray(
+          parsed?.questions
+        )
+          ? parsed.questions
+          : [];
+
+      const questions =
+        items
+          .map(
+            (it: any) => {
+
+              const question =
+                String(
+                  it?.question ||
+                  ""
+                ).trim();
+
+              const choices =
+                it?.choices &&
+                typeof it.choices ===
+                  "object"
+                  ? it.choices
+                  : {};
+
+              const A =
+                String(
+                  choices?.A || ""
+                ).trim();
+
+              const B =
+                String(
+                  choices?.B || ""
+                ).trim();
+
+              const C =
+                String(
+                  choices?.C || ""
+                ).trim();
+
+              const D =
+                String(
+                  choices?.D || ""
+                ).trim();
+
+              const answer =
+                String(
+                  it?.answer || ""
+                )
+                  .trim()
+                  .toUpperCase();
+
+              if (
+                !question ||
+                !A ||
+                !B ||
+                !C ||
+                !D
+              ) {
+                return null;
+              }
+
+              if (
+                ![
+                  "A",
+                  "B",
+                  "C",
+                  "D"
+                ].includes(
+                  answer
+                )
+              ) {
+                return null;
+              }
+
+              return {
+                question,
+
+                choices: {
+                  A,
+                  B,
+                  C,
+                  D
+                },
+
+                answer
+              };
+            }
+          )
+          .filter(Boolean);
+
+      return {
+        questions
+      };
+    }
+
+    const questions =
+      Array.isArray(
+        parsed?.questions
+      )
+        ? parsed.questions.map(
+            (q: any) =>
+              String(q)
+          )
+        : [];
+
+    return {
+      questions
+    };
+
+  } catch {
+
+    return {
+      questions: [
+        textOut
+      ]
+    };
+  }
+
+});
 
 export const gradeOmrWithAI = functions
   .https

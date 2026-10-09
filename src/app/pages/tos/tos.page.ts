@@ -814,6 +814,9 @@ private buildOverallResponseStats(): void {
     this.isLoadingStudents = true;
     try {
       this.students = await this.teacherService.getSubjectStudentsForClass(this.classId, this.subjectId);
+      console.log('========== STUDENT DATA ==========');
+      console.log(this.students);
+      console.log('FIRST STUDENT:', this.students?.[0]);
       this.recomputeStudentSummaries();
       if (this.students.length && !this.selectedStudentId) {
         this.selectedStudentId = this.students[0].id;

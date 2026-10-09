@@ -98,22 +98,69 @@ export class AnswerSheetGeneratorPage implements OnInit {
     return res.role === 'confirm';
   }
 
-  private computeTotalQuestionsFromTos(tos: TopicEntry[]): number {
-    const cognitiveLevels: (keyof TopicEntry)[] = [
-      'remembering',
-      'understanding',
-      'applying',
-      'analyzing',
-      'evaluating',
-      'creating',
-    ];
-    return (tos || []).reduce((sum, row) => {
-      return (
-        sum +
-        cognitiveLevels.reduce((s, level) => s + Number((row as any)?.[level] || 0), 0)
+  
+private computeTotalQuestionsFromTos(tos: TopicEntry[]): number {
+  console.log(
+  'ANSWER SHEET TOS DATA:',
+  JSON.stringify(
+    (tos || []).map((row: any) => ({
+      topicName: row.topicName,
+      expectedItems: row.expectedItems,
+      remembering: row.remembering,
+      understanding: row.understanding,
+      applying: row.applying,
+      analyzing: row.analyzing,
+      evaluating: row.evaluating,
+      creating: row.creating
+    })),
+    null,
+    2
+  )
+);
+  const cognitiveLevels: (keyof TopicEntry)[] = [
+    'remembering',
+    'understanding',
+    'applying',
+    'analyzing',
+    'evaluating',
+    'creating',
+  ];
+
+  return (tos || []).reduce((sum, row) => {
+    const expectedItems = (row as any)?.expectedItems;
+
+    // Use the TOS planned item count when it exists.
+    if (
+      expectedItems !== null &&
+      expectedItems !== undefined &&
+      String(expectedItems).trim() !== ''
+    ) {
+      const planned = Number(expectedItems);
+
+      return sum + (
+        Number.isFinite(planned)
+          ? Math.max(0, Math.floor(planned))
+          : 0
       );
-    }, 0);
-  }
+    }
+
+    // Fallback for older TOS rows without expectedItems.
+    const bloomTotal = cognitiveLevels.reduce(
+      (levelSum, level) => {
+        const value = Number((row as any)?.[level] || 0);
+
+        return levelSum + (
+          Number.isFinite(value)
+            ? Math.max(0, Math.floor(value))
+            : 0
+        );
+      },
+      0
+    );
+
+    return sum + bloomTotal;
+  }, 0);
+}
 
   private async resolveClassAndSubjectNames() {
     // Prefer local cache first
@@ -588,9 +635,110 @@ async exportPDF() {
      * Render the SVG directly.
      * This avoids html2canvas having to interpret the SVG/Angular DOM.
      */
-    const svgClone = svg.cloneNode(true) as SVGElement;
+    const svgClone = svg.cloneNode(true) as SVGSVGElement;
 
-    svgClone.setAttribute('xmlns', 'http://www.w3.org/2000/svg');
+svgClone.setAttribute('xmlns', 'http://www.w3.org/2000/svg');
+svgClone.setAttribute('xmlns:xlink', 'http://www.w3.org/1999/xlink');
+
+/*
+ * IMPORTANT:
+ * Explicitly write the Angular-generated student data
+ * into the cloned SVG before converting it to an image.
+ *
+ * This prevents Name / Roll Number from disappearing
+ * during SVG -> Image -> Canvas -> PDF conversion.
+ */
+    const clonedStudentName =
+  svgClone.querySelector('#student-name') as SVGTextElement | null;
+
+const clonedStudentRoll =
+  svgClone.querySelector('#student-roll') as SVGTextElement | null;
+
+// Explicitly restore student information
+if (clonedStudentName) {
+  clonedStudentName.textContent = this.currentStudentName || '';
+}
+
+if (clonedStudentRoll) {
+  clonedStudentRoll.textContent = this.currentStudentRollNumber || '';
+}
+
+// Restore class
+const clonedClass = Array.from(
+  svgClone.querySelectorAll('text')
+).find(el => el.textContent?.trim() === this.className);
+
+if (clonedClass) {
+  clonedClass.textContent = this.className || '';
+}
+
+
+// ============================================
+// STUDENT IDENTITY CODE
+// ============================================
+
+// Get the code grid directly from the current student.
+const grid = this.studentCodeGrid;
+
+console.log('PDF student:', {
+  studentId: this.currentStudentId,
+  name: this.currentStudentName,
+  roll: this.currentStudentRollNumber
+});
+
+console.log('PDF student code grid:', grid);
+
+// Find the cloned code group
+const codeGroup = svgClone.querySelector('#student-code');
+
+if (codeGroup) {
+
+  // Remove anything Angular may have generated
+  while (codeGroup.firstChild) {
+    codeGroup.removeChild(codeGroup.firstChild);
+  }
+
+  // Rebuild the 8x8 grid directly inside the cloned SVG
+  if (grid.length === 8) {
+
+    for (let r = 0; r < 8; r++) {
+
+      for (let c = 0; c < 8; c++) {
+
+        const rect = document.createElementNS(
+          'http://www.w3.org/2000/svg',
+          'rect'
+        );
+
+        rect.setAttribute('x', String(615 + c * 6));
+        rect.setAttribute('y', String(100 + r * 6));
+        rect.setAttribute('width', '6');
+        rect.setAttribute('height', '6');
+
+        rect.setAttribute(
+          'fill',
+          grid[r][c] ? 'black' : 'white'
+        );
+
+        rect.setAttribute('stroke', 'black');
+        rect.setAttribute('stroke-width', '0.4');
+
+        codeGroup.appendChild(rect);
+      }
+    }
+
+  } else {
+    console.warn('Student code grid is empty.');
+  }
+
+  console.log(
+    'PDF code rectangles:',
+    codeGroup.querySelectorAll('rect').length
+  );
+
+} else {
+  console.warn('student-code group not found in cloned SVG.');
+}
 
     const serializer = new XMLSerializer();
     const svgString = serializer.serializeToString(svgClone);
@@ -616,8 +764,8 @@ async exportPDF() {
       /*
        * Use the actual SVG dimensions.
        */
-      const svgWidth = 850;
-      const svgHeight = 1231;
+      const svgWidth = 800;
+      const svgHeight = 1000;
 
       const canvas = document.createElement('canvas');
 
@@ -666,9 +814,17 @@ async exportPDF() {
 
       const imageRatio = imgProps.height / imgProps.width;
 
-      let pdfWidth = pageWidth;
+  // ⭐ THIS controls the zoom
+      const zoom = 1.00;
+
+      let pdfWidth = pageWidth * zoom;
       let pdfHeight = pdfWidth * imageRatio;
 
+      const xOffset = 5;
+      const yOffset = 5;
+
+      const x = (pageWidth - pdfWidth) / 2 + xOffset;
+      const y = (pageHeight - pdfHeight) / 2 + yOffset;
       /*
        * Keep the entire answer sheet inside the A4 page.
        */
@@ -676,9 +832,6 @@ async exportPDF() {
         pdfHeight = pageHeight;
         pdfWidth = pdfHeight / imageRatio;
       }
-
-      const x = (pageWidth - pdfWidth) / 2;
-      const y = (pageHeight - pdfHeight) / 2;
 
       pdf.addImage(
         imgData,

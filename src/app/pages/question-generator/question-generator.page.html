@@ -107,8 +107,13 @@
             <ion-chip color="medium" class="meta-chip">
               <ion-label>{{ q.topic }}</ion-label>
             </ion-chip>
-            <ion-chip color="tertiary" class="meta-chip">
-              <ion-label>{{ q.level }}</ion-label>
+            <ion-chip
+              [color]="q.levelSource === 'ai' ? 'success' : 'tertiary'"
+              class="meta-chip"
+            >
+              <ion-label>
+                {{ q.level | titlecase }}{{ q.levelSource === 'ai' ? ' (AI)' : '' }}
+              </ion-label>
             </ion-chip>
 
             <ion-button fill="clear" color="danger" size="small" (click)="deleteQuestion(q)">

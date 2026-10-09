@@ -156,57 +156,11 @@
   <!-- Responses Tab -->
 <div *ngIf="viewMode === 'responses'">
   <ion-card class="participation-card">
-    <ion-card-header>
-      <ion-card-title class="dashboard-title">Student Responses</ion-card-title>
-    </ion-card-header>
-
     <ion-card-content>
 
-      <!-- Overall Statistics -->
-      <ion-card class="overall-response-card">
-        <ion-card-header>
-          <ion-card-title>Overall Statistics</ion-card-title>
-        </ion-card-header>
-        <ion-card-content>
-
-          <p>
-          <strong>Total Answers:</strong>
-          {{ overallResponseStats.totalAnswers }}
-        </p>
-
-        <p>
-          <strong>Correct:</strong>
-          {{ overallResponseStats.correct }}
-          ({{ overallResponseStats.correctPercentage | number:'1.0-1' }}%)
-        </p>
-
-        <p>
-          <strong>Incorrect:</strong>
-          {{ overallResponseStats.incorrect }}
-          ({{ overallResponseStats.incorrectPercentage | number:'1.0-1' }}%)
-        </p>
-
-        <hr>
-
-        <p><strong>Overall Answer Distribution</strong></p>
-
-        <p>A: {{ overallResponseStats.optionCounts.A }}</p>
-        <p>B: {{ overallResponseStats.optionCounts.B }}</p>
-        <p>C: {{ overallResponseStats.optionCounts.C }}</p>
-        <p>D: {{ overallResponseStats.optionCounts.D }}</p>
-        <hr>
-
-          <h3>Answer Distribution</h3>
-
-          <canvas 
-            id="responseDistributionChart"
-            style="width:100%; height:300px;">
-          </canvas>
-        </ion-card-content>
-      </ion-card>
 <ion-card>
   <ion-card-header>
-    <ion-card-title>Item Analysis (Test)</ion-card-title>
+    <ion-card-title>Item Analysis</ion-card-title>
   </ion-card-header>
 
   <ion-card-content>
@@ -282,7 +236,7 @@
 
               <div class="response-student-list">
                 <span class="response-preview-text">
-                  test
+                  
                 </span>
               </div>
 
