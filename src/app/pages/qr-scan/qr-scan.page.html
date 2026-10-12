@@ -1,0 +1,47 @@
+
+<ion-header>
+  <ion-toolbar>
+    <ion-title>Scan Student QR</ion-title>
+
+    <ion-buttons slot="start">
+      <ion-back-button defaultHref="/teacher-dashboard"></ion-back-button>
+    </ion-buttons>
+  </ion-toolbar>
+</ion-header>
+
+<ion-content class="ion-padding">
+  <div class="scanner-container">
+    <h2>Student Identification</h2>
+
+    <p>{{ message }}</p>
+
+    <div class="camera-frame">
+      <div class="ion-padding">
+        <p><strong>Scanner status:</strong> {{ debugStatus }}</p>
+      </div>
+      <div>
+        <zxing-scanner
+          [device]="selectedDevice"
+          [formats]="[BarcodeFormat.QR_CODE]"
+          (scanSuccess)="onCodeResult($event)"
+          (camerasFound)="onCamerasFound($event)"
+          (camerasNotFound)="onCamerasNotFound()"
+          (scanFailure)="onScanFailure($event)"
+          (scanError)="onScanError($event)">
+        </zxing-scanner>
+
+      <p><strong>Debug status:</strong> {{ debugStatus }}</p>
+
+
+      </div>
+    </div>
+
+
+    <ion-button
+      expand="block"
+      fill="outline"
+      (click)="goBack()">
+      Cancel
+    </ion-button>
+  </div>
+</ion-content>

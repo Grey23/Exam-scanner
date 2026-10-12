@@ -621,6 +621,10 @@
       [queryParams]="{ classId: classId, subjectId: subjectId }">
       Start Scanning
     </ion-button>
+    <ion-button routerLink="/qr-scan">
+  <ion-icon name="qr-code-outline" slot="start"></ion-icon>
+  Scan Student QR
+</ion-button>
     <div class="answersheet-shell">
       <app-answer-sheet-generator 
         [embedded]="true"

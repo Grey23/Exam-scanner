@@ -1013,6 +1013,7 @@ for (let r = 0; r < 8; r++) {
       sampleRect.x + sampleRect.width > warped.cols ||
       sampleRect.y + sampleRect.height > warped.rows
     ) {
+      /*
       alert(
         '❌ ROI OUT OF BOUNDS\n\n' +
         `Cell: [${r}, ${c}]\n` +
@@ -1023,7 +1024,7 @@ for (let r = 0; r < 8; r++) {
         `Warped:\n` +
         `${warped.cols} × ${warped.rows}`
       );
-
+*/
       return null;
     }
 
@@ -1073,6 +1074,7 @@ for (let r = 0; r < 8; r++) {
   grid[r][0] = 1;
 }
 // Show all 64 cells in ONE alert
+/*
 alert(
   '📦 STUDENT CODE CELL VALUES\n\n' +
   cellDebug.join('\n') +
@@ -1080,7 +1082,7 @@ alert(
   '========== 8×8 GRID ==========\n\n' +
   grid.map(row => row.join(' ')).join('\n')
 );
-
+*/
     console.log('========== STUDENT CODE GRID ==========');
     console.table(grid);
     alert(
@@ -1104,23 +1106,25 @@ alert(
         leftColumnBlackCount >= 7;
 
       // Show finder test on mobile
+
+      /*
       alert(
         '🔍 FINDER PATTERN CHECK\n\n' +
         `Top row: ${topRowBlackCount}/8 black\n` +
         `Left column: ${leftColumnBlackCount}/8 black\n\n` +
         `Result: ${finderValid ? '✅ VALID' : '❌ INVALID'}`
       );
-
+*/
       if (!finderValid) {
         console.warn('Student code finder pattern not valid.');
         console.table(grid);
-
+/*
         alert(
           '⚠️ CODE PATTERN FAILED\n\n' +
           'Grid detected:\n' +
           grid.map(row => row.join(' ')).join('\n')
         );
-
+*/
         return null;
       }
 
@@ -1165,14 +1169,14 @@ alert(
     const classId = bitsToNumber(0);
     const subjectId = bitsToNumber(16);
     const studentId = bitsToNumber(32);
-
+/*
     alert(
       '🎉 CODE DECODED!\n\n' +
       `Class ID: ${classId}\n` +
       `Subject ID: ${subjectId}\n` +
       `Student ID: ${studentId}`
     );
-
+*/
     const decoded = {
       classId,
       subjectId,
@@ -1185,7 +1189,7 @@ alert(
     return decoded;
 
   } catch (error) {
-
+/*
   console.error(
     'Failed to decode student identity code:',
     error
@@ -1195,7 +1199,7 @@ alert(
     '❌ DECODER ERROR\n\n' +
     String(error)
   );
-
+*/
   return null;
 }
 }
@@ -1749,7 +1753,7 @@ onStartCameraButtonClick() {
       // In the processVideo function, when all boxes are detected:
       if (detectedBoxes.every(v => v) && !this.isProcessing && !this.croppedImageUrl) {
 
-        alert("Auto capture triggered");
+        //alert("Auto capture triggered");
         this.isProcessing = true;
 
         const capturedFrame = ctx.getImageData(0, 0, canvas.width, canvas.height);
@@ -2024,7 +2028,7 @@ onStartCameraButtonClick() {
     gray.delete();
     //norm.delete();
     if (markerCorners.length !== 4) throw new Error("Expected 4 corners, got " + markerCorners.length);
-    alert("✅ Found 4 corners, ordering...");
+    //alert("✅ Found 4 corners, ordering...");
     const sum = markerCorners.map(p => p.x + p.y);
     const diff = markerCorners.map(p => p.x - p.y);
 
@@ -2067,7 +2071,7 @@ onStartCameraButtonClick() {
     );
 
     console.log('✅ Perspective correction complete');
-
+/*
     // ==========================================
     // DECODE STUDENT IDENTITY CODE
     // ==========================================
@@ -2106,14 +2110,14 @@ onStartCameraButtonClick() {
       });
 
       await alert.present();
-    }
+    }*/
     // Save warpedMat for processSheet
     if (this.latestWarpedMat) {
       this.latestWarpedMat.delete();
     }
 
     this.latestWarpedMat = dst.clone();
-    //alert("✅ Perspective transform complete");
+    alert("✅ Perspective transform complete");
 
     // ✅ Save warpedMat for processSheet
     //if (this.latestWarpedMat) this.latestWarpedMat.delete();

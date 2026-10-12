@@ -135,6 +135,19 @@ const routes: Routes = [
     loadComponent: () => import('./pages/teacher-settings/teacher-settings.page').then(m => m.TeacherSettingsPage),
     canActivate: [TeacherGuard]
   },
+  
+  {
+    path: 'qr-scan',
+    loadComponent: () =>
+      import('./pages/qr-scan/qr-scan.page')
+        .then(m => m.QrScanPage),
+    canActivate: [AuthGuard]
+  },
+  {
+    path: 'qr-scan',
+    loadChildren: () => import('./pages/qr-scan/qr-scan.module').then( m => m.QrScanPageModule)
+  },
+
 ];
 
 @NgModule({

@@ -13,7 +13,7 @@ import { Filesystem, Directory, Encoding } from '@capacitor/filesystem';
 import { TeacherService, ClassStudent } from '../../services/teacher.service';
 import { bubbles, BubbleTemplate } from '../../data/bubble-template';
 import html2canvas from 'html2canvas';
-
+import * as QRCode from 'qrcode';
 
 @Component({
   selector: 'app-answer-sheet-generator',
@@ -43,15 +43,17 @@ export class AnswerSheetGeneratorPage implements OnInit {
   private currentStudentId: number | null = null;
 
   // Small binary grid code (8x8) for student identity
-  private readonly CODE_GRID_SIZE = 8;
-  private readonly CODE_CELL_SIZE = 6; // template pixels
+  //private readonly CODE_GRID_SIZE = 8;
+  //private readonly CODE_CELL_SIZE = 6; // template pixels
 
-  private studentCodeGridCacheKey = '';
-  private studentCodeGridCacheValue: number[][] | null = null;
+  //private studentCodeGridCacheKey = '';
+  //private studentCodeGridCacheValue: number[][] | null = null;
 
   private readonly EXPORT_CANVAS_TIMEOUT_MS = 15000;
   private readonly EXPORT_PDF_TIMEOUT_MS = 45000;
-
+  // QR code for the currently selected student.
+  currentStudentQrDataUrl = '';
+  private currentStudentSheetId = '';
   isExporting = false;
 
   constructor(
@@ -250,20 +252,29 @@ private computeTotalQuestionsFromTos(tos: TopicEntry[]): number {
       this.totalQuestions = bubbles.length;
     }
   }
-
-  applySelectedStudent() {
-    if (this.selectedStudentId === 'all') {
-      this.currentStudentName = '';
-      this.currentStudentRollNumber = '';
-      return;
-    }
-
-    const idNum = Number(this.selectedStudentId);
-    const st = (this.students || []).find(s => Number(s.id) === idNum);
-    this.currentStudentName = st ? String(st.name || '') : '';
-    this.currentStudentRollNumber = st ? String(st.roll_number || '') : '';
-    this.currentStudentId = st ? Number(st.id) : null;
+applySelectedStudent(): void {
+  if (String(this.selectedStudentId) === 'all') {
+    this.currentStudentId = null;
+    this.currentStudentName = '';
+    this.currentStudentRollNumber = '';
+    this.currentStudentSheetId = '';
+    this.currentStudentQrDataUrl = '';
+    return;
   }
+
+  const idNum = Number(this.selectedStudentId);
+  const st = (this.students || []).find(
+    s => Number(s.id) === idNum
+  );
+
+  this.currentStudentId = st ? Number(st.id) : null;
+  this.currentStudentName = st ? String(st.name || '') : '';
+  this.currentStudentRollNumber = st
+    ? String(st.roll_number || '')
+    : '';
+
+  void this.updateStudentQrCode();
+}
 
   get selectedStudentLabel(): string {
     if (this.selectedStudentId === 'all') return 'All Students';
@@ -293,6 +304,7 @@ private computeTotalQuestionsFromTos(tos: TopicEntry[]): number {
    * Build an 8x8 binary grid encoding (classId, subjectId, studentId).
    * We only need this for the currently rendered student/page.
    */
+  /*
   get studentCodeGrid(): number[][] {
     if (!this.currentStudentId) return [];
 
@@ -341,7 +353,58 @@ private computeTotalQuestionsFromTos(tos: TopicEntry[]): number {
     this.studentCodeGridCacheValue = grid;
     return grid;
   }
+*/
+private async updateStudentQrCode(): Promise<void> {
+  const studentId = Number(this.currentStudentId);
+  const classId = Number(this.classId);
+  const subjectId = Number(this.subjectId);
 
+  // Do not generate a QR code without a valid student.
+  if (
+    !Number.isFinite(studentId) || studentId <= 0 ||
+    !Number.isFinite(classId) || classId <= 0 ||
+    !Number.isFinite(subjectId) || subjectId <= 0
+  ) {
+    this.currentStudentSheetId = '';
+    this.currentStudentQrDataUrl = '';
+    return;
+  }
+
+  // Stable for this student's sheet in this class and subject.
+  // A future assessment ID can distinguish separate exams.
+  const sheetId = `KES-${classId}-${subjectId}-${studentId}`;
+  this.currentStudentSheetId = sheetId;
+
+  const payload = {
+    subjectId,
+    studentId,
+    sheetId
+  };
+
+  try {
+    const qrDataUrl = await QRCode.toDataURL(
+      JSON.stringify(payload),
+      {
+        errorCorrectionLevel: 'M',
+        type: 'image/png',
+        margin: 4,
+        width: 256
+      }
+    );
+
+    // Prevent a slower previous request from replacing a newer student's QR.
+    if (this.currentStudentSheetId === sheetId) {
+      this.currentStudentQrDataUrl = qrDataUrl;
+    }
+  } catch (error) {
+    console.error('QR code generation failed:', error);
+    this.currentStudentQrDataUrl = '';
+    await this.presentAlert(
+      'Could not generate the student QR code. Please try again.',
+      'QR Code Error'
+    );
+  }
+}
   private svgElementToCanvas(
     svgEl: SVGElement,
     width: number,
@@ -678,6 +741,7 @@ if (clonedClass) {
 // ============================================
 
 // Get the code grid directly from the current student.
+/*
 const grid = this.studentCodeGrid;
 
 console.log('PDF student:', {
@@ -739,7 +803,38 @@ if (codeGroup) {
 } else {
   console.warn('student-code group not found in cloned SVG.');
 }
+*/
 
+// ============================================
+// STUDENT QR CODE
+// ============================================
+
+const clonedQr = svgClone.querySelector(
+  '#student-qr'
+) as SVGImageElement | null;
+
+if (clonedQr && this.currentStudentQrDataUrl) {
+  // Explicitly embed the QR image in the cloned SVG.
+  clonedQr.setAttribute('href', this.currentStudentQrDataUrl);
+  clonedQr.setAttribute(
+    'xlink:href',
+    this.currentStudentQrDataUrl
+  );
+
+  console.log('PDF QR code embedded:', {
+    sheetId: this.currentStudentSheetId,
+    studentId: this.currentStudentId,
+    qrImagePresent: true
+  });
+} else {
+  console.warn(
+    'Student QR code is missing. PDF export should be stopped.'
+  );
+
+  throw new Error(
+    'Student QR code is not ready. Select a student and try again.'
+  );
+}
     const serializer = new XMLSerializer();
     const svgString = serializer.serializeToString(svgClone);
 

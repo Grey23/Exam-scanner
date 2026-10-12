@@ -1,0 +1,58 @@
+
+.scanner-container {
+  max-width: 600px;
+  margin: 0 auto;
+  text-align: center;
+}
+
+
+.scanner-container {
+  max-width: 600px;
+  margin: 0 auto;
+  text-align: center;
+}
+
+
+zxing-scanner {
+  display: block;
+  width: 100%;
+}
+
+.zoom-controls {
+  width: 100%;
+  max-width: 480px;
+  margin: 16px auto;
+  padding: 12px;
+  text-align: center;
+}
+
+.zoom-controls ion-range {
+  display: block;
+  padding: 8px 12px;
+}
+
+p {
+  color: var(--ion-color-medium);
+}
+
+.camera-frame {
+  width: 100%;
+  max-width: 480px;
+  margin: 20px auto;
+  overflow: hidden;
+  position: relative;
+  border: 2px solid var(--ion-color-primary);
+  border-radius: 12px;
+  background: #000;
+}
+
+.camera-zoom-wrapper {
+  width: 100%;
+  transform-origin: center center;
+}
+
+.camera-zoom-wrapper zxing-scanner {
+  display: block;
+  width: 100%;
+}
+

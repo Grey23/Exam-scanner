@@ -45,10 +45,10 @@
       
       <!-- Professional Header -->
 <rect x="125" y="40" width="550" height="115" fill="none" stroke="black" stroke-width="2" />
-<line x1="125" y1="75" x2="675" y2="75" stroke="black" stroke-width="1" />
+<line x1="125" y1="75" x2="500" y2="75" stroke="black" stroke-width="1" />
 
 <!-- Exam Title -->
-<text x="350" y="65" font-size="25" font-weight="bold" text-anchor="middle" font-family="Arial, sans-serif">
+<text x="325" y="65" font-size="25" font-weight="bold" text-anchor="middle" font-family="Arial, sans-serif">
   {{ subjectName || 'EXAMINATION ANSWER SHEET' }}
 </text>
 
@@ -69,10 +69,10 @@
   <text x="200" y="120" font-size="16">{{ className }}</text>
   
   <!-- Roll Number Section (Right Side of Header) -->
-  <line x1="500" y1="40" x2="500" y2="140" stroke="black" stroke-width="1" />
-  <text x="510" y="90" font-size="14" font-weight="bold">ROLL NUMBER:</text>
-  <rect x="500" y="95" width="175" height="60" fill="#fcfcfc" stroke="black" stroke-width="2" rx="3" />
-  <text id="student-roll" x="555" y="140" font-size="22" font-weight="bold" text-anchor="middle" letter-spacing="3">
+  <line x1="500" y1="40" x2="500" y2="155" stroke="black" stroke-width="1" />
+  <text x="375" y="120" font-size="14" font-weight="bold">ROLL NUMBER:</text>
+  
+  <text id="student-roll" x="435" y="150" font-size="15" font-weight="bold" text-anchor="middle" letter-spacing="3">
     {{ currentStudentRollNumber }}
   </text>
 </g>
@@ -134,6 +134,7 @@
       </g>
     -->
       <!-- Student Identity Code (8x8 grid) -->
+       <!---
       <g id="student-code" *ngIf="currentStudentName || currentStudentRollNumber">
         <ng-container *ngFor="let row of studentCodeGrid; let r = index">
           <ng-container *ngFor="let bit of row; let c = index">
@@ -149,7 +150,19 @@
           </ng-container>
         </ng-container>
       </g>
-
+    -->
+      <!-- Student Identity QR Code -->
+    <image
+      *ngIf="currentStudentQrDataUrl"
+      id="student-qr"
+      [attr.href]="currentStudentQrDataUrl"
+      [attr.xlink:href]="currentStudentQrDataUrl"
+      x="535"
+      y="42"
+      width="110"
+      height="110"
+      preserveAspectRatio="xMidYMid meet"
+    />
       <!-- ANSWER GRID OUTLINE (thick rectangle around all bubbles) -->
        <!---
       <rect

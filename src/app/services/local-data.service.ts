@@ -25,7 +25,6 @@ export interface AnswerEntry {
   level?: string | null;        // 🔹 Bloom’s level
 }
 
-
 export interface ScannedResult {
   id: number;
   headerImage: string;
